@@ -98,7 +98,7 @@
                     <span v-if="currentView === 'form'"><button @click="currentView = 'list'" class="text-slate-400 hover:text-slate-700 mr-2"><i class="fas fa-arrow-left"></i></button></span>
                     {{ getTabTitle() }} <span class="text-sm font-normal text-slate-500 bg-slate-100 px-2 py-1 rounded-full border border-slate-200">Tahun {{ currentYear }}</span>
                 </h2>
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 flex-wrap justify-end">
                     <select v-if="currentTab !== 'dashboard' && currentView === 'list'" v-model="filterStatus" class="border border-slate-300 rounded-lg text-sm py-2 px-3 focus:ring-2 focus:ring-primary focus:border-primary transition-all bg-white max-w-[160px] truncate text-slate-600">
                         <option value="">Semua Status</option>
                         <option v-for="st in availableStatuses" :key="st" :value="st">{{ st }}</option>
@@ -111,6 +111,11 @@
                         <input type="text" v-model="searchQuery" placeholder="Carian..." class="pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary w-48 transition-all">
                         <i class="fas fa-search absolute left-3 top-2.5 text-slate-400"></i>
                     </div>
+                    
+                    <button v-if="currentTab !== 'dashboard' && currentView === 'list'" @click="exportToCSV()" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-medium py-2 px-3 rounded-lg text-sm transition-colors shadow-sm flex items-center gap-2" title="Eksport ke Excel/CSV">
+                        <i class="fas fa-file-csv"></i> <span class="hidden md:inline">Eksport</span>
+                    </button>
+                    
                     <button @click="window.print()" class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-medium py-2 px-4 rounded-lg text-sm transition-colors shadow-sm flex items-center gap-2">
                         <i class="fas fa-print"></i> Cetak
                     </button>
@@ -124,7 +129,7 @@
             <div class="flex-1 overflow-y-auto p-4 md:p-6 pb-24 print:p-0">
                 
                 <!-- NOTIFICATION SYSTEM -->
-                <div v-if="notification.show" class="fixed top-4 right-4 z-50 flex items-center p-4 mb-4 rounded-lg shadow-lg" :class="notification.isError ? 'bg-red-50 text-red-800 border border-red-200' : 'bg-green-50 text-green-800 border border-green-200'" role="alert">
+                <div v-if="notification.show" class="fixed top-4 right-4 z-50 flex items-center p-4 mb-4 rounded-lg shadow-lg transition-all duration-300" :class="notification.isError ? 'bg-red-50 text-red-800 border border-red-200' : 'bg-green-50 text-green-800 border border-green-200'" role="alert">
                     <i class="fas mr-3" :class="notification.isError ? 'fa-exclamation-circle' : 'fa-check-circle'"></i>
                     <div class="text-sm font-medium">{{ notification.message }}</div>
                 </div>
@@ -204,7 +209,7 @@
                         </div>
 
                         <!-- NEW BOX: Senarai Baki Aduan (Tahun Sebelum) -->
-                        <div v-if="currentYear === '2026'" class="bg-white rounded-xl shadow-md border border-slate-200 p-6 print-break-inside-avoid lg:col-span-3">
+                        <div v-if="currentYear === '2026' || bakiAduanList.length > 0" class="bg-white rounded-xl shadow-md border border-slate-200 p-6 print-break-inside-avoid lg:col-span-3">
                             <h3 class="text-lg font-bold text-slate-800 mb-4 border-b pb-3 flex items-center gap-2">
                                 <i class="fas fa-history text-orange-500"></i> Senarai Baki Aduan (Tahun Sebelum)
                             </h3>
@@ -416,7 +421,7 @@
                                     </td>
                                     
                                     <td class="px-4 py-3">
-                                        <span class="px-2 py-1 text-xs font-medium rounded-full border bg-opacity-10" :class="getStatusColor(item.status_auto || item.status)">
+                                        <span class="px-2 py-1 text-xs font-medium rounded-full border bg-opacity-10 whitespace-nowrap" :class="getStatusColor(item.status_auto || item.status)">
                                             {{ item.status_auto || item.status || 'Baru' }}
                                         </span>
                                     </td>
@@ -820,7 +825,6 @@
                         'Johor': ['Johor Bahru', 'Batu Pahat', 'Muar', 'Kluang', 'Kota Tinggi', 'Segamat', 'Pontian', 'Mersing', 'Kulai', 'Tanggak'],
                         'Perak': ['Kinta', 'Larut, Matang & Selama', 'Manjung', 'Hilir Perak', 'Kerian', 'Batang Padang', 'Kuala Kangsar', 'Perak Tengah', 'Hulu Perak', 'Kampar', 'Muallim', 'Bagan Datuk'],
                         'Pahang': ['Kuantan', 'Temerloh', 'Bentong', 'Maran', 'Rompin', 'Pekan', 'Bera', 'Raub', 'Jerantut', 'Lipis', 'Cameron Highlands'],
-                        // Fallback generic list for brevity in this single file demo
                         'Kedah': ['Kota Setar', 'Kuala Muda', 'Kulim', 'Baling', 'Kubang Pasu', 'Langkawi'],
                         'Kelantan': ['Kota Bharu', 'Pasir Mas', 'Tumpat', 'Bachok', 'Tanah Merah', 'Kuala Krai'],
                         'Terengganu': ['Kuala Terengganu', 'Kemaman', 'Dungun', 'Besut'],
@@ -958,7 +962,36 @@
                 };
 
                 // URL WEB APP GOOGLE APPS SCRIPT ANDA
-                const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx-1cNHy-vEVwymeLtV55ouNddNThaUwl-VE8dPlw2gUqs4bwI5WO3o9oS9bxklO_4fBg/exec'; 
+                const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwjg7ciKDDXeHlegsSDFvAQTfum_q-pvII0kmsKwIkrg1CWOc7QbAShrWwARGM0IEez/exec'; 
+
+                // --- FUNGSI PEMBANTU UNTUK GOOGLE SHEETS ---
+                const syncToGoogleSheets = (tab, action, data, oldId = null, successMsg = 'Tindakan berjaya dihantar ke Google Sheets.') => {
+                    const payload = {
+                        tab: tab,
+                        action: action, // 'add', 'edit', 'delete', atau 'carry_forward'
+                        data: data
+                    };
+                    
+                    // Jika ada ID lama (khas untuk rujukan bawa ke hadapan)
+                    if (oldId) payload.oldId = oldId;
+
+                    fetch(GOOGLE_SCRIPT_URL, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        headers: {
+                            'Content-Type': 'text/plain' 
+                        },
+                        body: JSON.stringify(payload)
+                    })
+                    .then(() => {
+                        // Mod 'no-cors' tidak memulangkan data, tetapi jika melepasi blok ini bermakna tiada ralat rangkaian.
+                        showNotify(successMsg);
+                    })
+                    .catch((error) => {
+                        console.error('Ralat integrasi Google Sheets:', error);
+                        showNotify('Berlaku ralat semasa cuba menghantar data ke Google Sheets!', true);
+                    });
+                };
 
                 const saveForm = () => {
                     // Enforce max 3 pics
@@ -976,48 +1009,31 @@
                         if (currentTab.value === 'stage2') formData.value.noLaporan = generateStage2Id();
                         
                         targetArray.push(JSON.parse(JSON.stringify(formData.value)));
+                        
+                        // --- HANTAR KE GOOGLE SHEETS (TAMBAH) ---
+                        syncToGoogleSheets(currentTab.value, 'add', formData.value, null, 'Rekod baru berjaya ditambah dan disimpan ke dalam Google Sheet.');
                     } else {
                         const index = targetArray.findIndex(r => r.id === formData.value.id);
                         if (index !== -1) {
                             targetArray[index] = JSON.parse(JSON.stringify(formData.value));
+                            
+                            // --- HANTAR KE GOOGLE SHEETS (KEMASKINI) ---
+                            syncToGoogleSheets(currentTab.value, 'edit', formData.value, null, 'Rekod berjaya dikemaskini di dalam sistem dan Google Sheet.');
                         }
                     }
                     currentView.value = 'list';
-
-                    // --- INTEGRASI GOOGLE SHEETS DENGAN FETCH API ---
-                    const payload = {
-                        tab: currentTab.value,
-                        action: formMode.value, // add atau edit
-                        data: formData.value
-                    };
-
-                    // Hantar data menggunakan format text/plain bagi mengelakkan isu CORS
-                    fetch(GOOGLE_SCRIPT_URL, {
-                        method: 'POST',
-                        mode: 'no-cors',
-                        headers: {
-                            'Content-Type': 'text/plain' 
-                        },
-                        body: JSON.stringify(payload)
-                    })
-                    .then(() => {
-                        // Mod no-cors memberikan "opaque response" yang tidak mengandungi data 
-                        // Jika berjaya dan tiada ralat seperti network timeout, fungsi masuk ke sini.
-                        const actionText = formMode.value === 'add' ? 'ditambah' : 'dikemaskini';
-                        showNotify(`Rekod berjaya ${actionText} dan dihantar ke pangkalan data.`);
-                    })
-                    .catch((error) => {
-                        console.error('Ralat integrasi Google Sheets:', error);
-                        // Ralat ditangkap dan dimaklumkan sekiranya panggilan gagal
-                        showNotify('Berlaku ralat semasa cuba menghantar data ke Google Sheets!', true);
-                    });
                 };
 
                 const deleteConfirm = (item) => {
                     showConfirm('Padam Rekod', 'Adakah anda pasti mahu memadam rekod ini? Tindakan ini tidak boleh dipulihkan.', true, () => {
                         const targetArray = records[currentTab.value];
                         const index = targetArray.findIndex(r => r.id === item.id);
-                        if (index !== -1) { targetArray.splice(index, 1); showNotify('Rekod berjaya dipadam.'); }
+                        if (index !== -1) { 
+                            targetArray.splice(index, 1); 
+                            
+                            // --- HANTAR KE GOOGLE SHEETS (PADAM) ---
+                            syncToGoogleSheets(currentTab.value, 'delete', { id: item.id }, null, 'Rekod berjaya dipadam dari sistem dan Google Sheet.');
+                        }
                         confirmDialog.show = false;
                     });
                 };
@@ -1051,17 +1067,50 @@
                             targetArray.splice(index, 1);
                         }
 
-                        showNotify(`Rekod berjaya dibawa ke tahun ${nextYear}.`);
+                        // --- HANTAR KE GOOGLE SHEETS (BAWA KE HADAPAN) ---
+                        syncToGoogleSheets(currentTab.value, 'carry_forward', clonedItem, item.id, `Rekod berjaya dibawa ke tahun ${nextYear} dan direkodkan di Google Sheet.`);
+                        
                         confirmDialog.show = false;
                     });
                 };
 
-                // Helper for date diff in days
-                const dateDiff = (d1, d2) => {
-                    if(!d1 || !d2) return 0;
-                    return Math.floor((new Date(d1) - new Date(d2)) / (1000 * 60 * 60 * 24));
+                const exportToCSV = () => {
+                    const list = filteredList.value;
+                    if (!list.length) return showNotify('Tiada rekod untuk dieksport.', true);
+                    
+                    // Always add common ones if they exist in object
+                    const allKeys = new Set();
+                    list.forEach(item => Object.keys(item).forEach(k => allKeys.add(k)));
+                    
+                    // Filter out complex objects/arrays except 'pics'
+                    const finalHeaders = Array.from(allKeys).filter(k => 
+                        (typeof list[0][k] !== 'object' || k === 'pics') && 
+                        !['id', 'siList', 'isBakiTahunSebelum'].includes(k)
+                    );
+
+                    const csvContent = "data:text/csv;charset=utf-8," 
+                        + finalHeaders.join(",") + "\n"
+                        + list.map(row => {
+                            return finalHeaders.map(h => {
+                                let val = row[h];
+                                if (h === 'pics' && Array.isArray(val)) val = val.join(', ');
+                                if (val === undefined || val === null) val = '';
+                                // escape quotes for CSV safely
+                                val = String(val).replace(/"/g, '""');
+                                return `"${val}"`;
+                            }).join(",");
+                        }).join("\n");
+                        
+                    const encodedUri = encodeURI(csvContent);
+                    const link = document.createElement("a");
+                    link.setAttribute("href", encodedUri);
+                    link.setAttribute("download", `BRGF_${currentTab.value}_${currentYear.value}.csv`);
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    showNotify('Muat turun CSV dimulakan.');
                 };
-                
+
                 const getPercentage = (val, total) => total > 0 ? (val/total*100) : 0;
                 
                 const currentYearRecords = (tab) => records[tab].filter(r => r.year === currentYear.value);
@@ -1240,40 +1289,75 @@
                     return parseFloat(val || 0).toLocaleString('ms-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                 };
 
-                // Seed some dummy data for initial view (Single-session requirement)
+                // --- DATA PERSISTENCE LOGIC ---
+                const STORAGE_KEY = 'brgf_data_v1';
+                
+                const loadData = () => {
+                    try {
+                        const saved = localStorage.getItem(STORAGE_KEY);
+                        if (saved) {
+                            const parsed = JSON.parse(saved);
+                            if (parsed.records) Object.assign(records, parsed.records);
+                            if (parsed.personnel) lists.personnel = parsed.personnel;
+                            if (parsed.years) years.value = parsed.years;
+                            if (parsed.currentYear) currentYear.value = parsed.currentYear;
+                            return true;
+                        }
+                    } catch (e) {
+                        console.error('Error loading data from local storage', e);
+                    }
+                    return false;
+                };
+
+                // Watch for changes and save automatically
+                watch([records, () => lists.personnel, years, currentYear], () => {
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                        records: records,
+                        personnel: lists.personnel,
+                        years: years.value,
+                        currentYear: currentYear.value
+                    }));
+                }, { deep: true });
+
+
+                // Initialize App Data
                 onMounted(() => {
-                    records.stage1.push({
-                        id: '1', year: activeYear, noAduan: `CKG/BRGF/${activeYear}/001`, perihal: 'Tanah Runtuh di cerun belakang blok A',
-                        negeri: 'Selangor', daerah: 'Hulu Langat', hopt: 'JKR Hulu Langat', pemilik: 'KPM',
-                        tarikhTerima: `${activeYear}-05-05`,
-                        tarikhLawatan: `${activeYear}-05-10`, maklumBalasJadual: `${activeYear}-05-13`, maklumBalasSebenar: `${activeYear}-05-12`,
-                        status: 'selesai', masalah: 'Ketidakstabilan Cerun', impak: 'besar', punca: 'Semula Jadi', pics: ['JAP', 'JAK'],
-                        tarikhBorangKepuasan: `${activeYear}-06-01`
-                    });
+                    const hasData = loadData();
                     
-                    // Add dummy baki record for demo purposes
-                    records.stage1.push({
-                        id: 'baki-1', year: activeYear, noAduan: `CKG/BRGF/${parseInt(activeYear)-1}/099`, perihal: 'Runtuhan Tembok Lama',
-                        negeri: 'Johor', daerah: 'Johor Bahru', hopt: 'JKR Johor', pemilik: 'KPM',
-                        tarikhTerima: `${parseInt(activeYear)-1}-11-20`,
-                        tarikhLawatan: `${parseInt(activeYear)-1}-12-05`,
-                        status: 'penyediaan', masalah: 'Kegagalan Tembok Penahan', impak: 'besar', punca: 'Penyenggaraan', pics: ['Hayatul Husna'],
-                        isBakiTahunSebelum: true, tarikhLaporanAduan: ''
-                    });
-                    
-                    records.stage2.push({
-                        id: '2', year: activeYear, noLaporan: `CKG/BRGF-LA/${activeYear}-001`, daerah: 'Kinta', negeri: 'Perak',
-                        peruntukan: 45000, tarikhSahanPeruntukan: `${activeYear}-02-15`, tarikhMohonKontraktor: `${activeYear}-03-01`, tarikhMulaKerja: `${activeYear}-03-15`
-                    });
-                    records.stage3.push({
-                        id: '3', year: activeYear, noProjek: `PRJ-${activeYear}-01`, daerah: 'Kuantan', negeri: 'Pahang',
-                        peruntukan: 1200000, tarikhSahanPeruntukan: `${activeYear}-01-10`, tarikhMulaKerja: `${activeYear}-04-01`
-                    });
+                    // Fallback to seed dummy data if no local storage exists (First time visit)
+                    if (!hasData) {
+                        records.stage1.push({
+                            id: '1', year: activeYear, noAduan: `CKG/BRGF/${activeYear}/001`, perihal: 'Tanah Runtuh di cerun belakang blok A',
+                            negeri: 'Selangor', daerah: 'Hulu Langat', hopt: 'JKR Hulu Langat', pemilik: 'KPM',
+                            tarikhTerima: `${activeYear}-05-05`,
+                            tarikhLawatan: `${activeYear}-05-10`, maklumBalasJadual: `${activeYear}-05-13`, maklumBalasSebenar: `${activeYear}-05-12`,
+                            status: 'selesai', masalah: 'Ketidakstabilan Cerun', impak: 'besar', punca: 'Semula Jadi', pics: ['JAP', 'JAK'],
+                            tarikhBorangKepuasan: `${activeYear}-06-01`
+                        });
+                        
+                        records.stage1.push({
+                            id: 'baki-1', year: activeYear, noAduan: `CKG/BRGF/${parseInt(activeYear)-1}/099`, perihal: 'Runtuhan Tembok Lama',
+                            negeri: 'Johor', daerah: 'Johor Bahru', hopt: 'JKR Johor', pemilik: 'KPM',
+                            tarikhTerima: `${parseInt(activeYear)-1}-11-20`,
+                            tarikhLawatan: `${parseInt(activeYear)-1}-12-05`,
+                            status: 'penyediaan', masalah: 'Kegagalan Tembok Penahan', impak: 'besar', punca: 'Penyenggaraan', pics: ['Hayatul Husna'],
+                            isBakiTahunSebelum: true, tarikhLaporanAduan: ''
+                        });
+                        
+                        records.stage2.push({
+                            id: '2', year: activeYear, noLaporan: `CKG/BRGF-LA/${activeYear}-001`, daerah: 'Kinta', negeri: 'Perak',
+                            peruntukan: 45000, tarikhSahanPeruntukan: `${activeYear}-02-15`, tarikhMohonKontraktor: `${activeYear}-03-01`, tarikhMulaKerja: `${activeYear}-03-15`
+                        });
+                        records.stage3.push({
+                            id: '3', year: activeYear, noProjek: `PRJ-${activeYear}-01`, daerah: 'Kuantan', negeri: 'Pahang',
+                            peruntukan: 1200000, tarikhSahanPeruntukan: `${activeYear}-01-10`, tarikhMulaKerja: `${activeYear}-04-01`
+                        });
+                    }
                 });
 
                 return {
                     currentTab, currentView, formMode, mobileMenuOpen, currentYear, years, searchQuery, filterStatus, filterPic, availableStatuses,
-                    changeTab, getTabTitle, addYear, formData, saveForm, openForm, editItem, deleteConfirm, carryForward,
+                    changeTab, getTabTitle, addYear, formData, saveForm, openForm, editItem, deleteConfirm, carryForward, exportToCSV,
                     confirmDialog, promptDialog, lists, showPersonnelModal, newPersonnelName, addPersonnel, removePersonnel,
                     newSiType, addSiType, generateAutoIdIfValid, calculateStage2Status, calculateProjectStatus,
                     filteredList, bakiAduanList, getStatusColor, stats, getPercentage, formatCurrency, notification, window
