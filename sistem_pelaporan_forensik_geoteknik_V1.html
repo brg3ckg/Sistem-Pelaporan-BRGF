@@ -1,0 +1,1317 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Pelaporan Forensik Geoteknik</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: { primary: '#0ea5e9', secondary: '#475569', dark: '#1e293b' }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #f8fafc; }
+        [v-cloak] { display: none; }
+        
+        @media print {
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            body { background-color: white; }
+            .shadow, .shadow-md, .shadow-sm { box-shadow: none !important; }
+            .border-transparent { border-color: #e2e8f0 !important; border-width: 1px !important; }
+            .print-break-inside-avoid { break-inside: avoid; }
+            @page { margin: 1cm; size: A4 landscape; }
+        }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="text-slate-800 antialiased h-screen flex overflow-hidden">
+    <div id="app" v-cloak class="w-full h-full flex flex-col md:flex-row">
+
+        <aside class="no-print w-full md:w-64 bg-dark text-slate-300 flex flex-col shadow-xl shrink-0 z-20">
+            <div class="p-4 bg-slate-900 flex items-center justify-between md:justify-center">
+                <div class="flex items-center gap-3">
+                    <div class="bg-primary text-white p-2 rounded-lg"><i class="fas fa-layer-group"></i></div>
+                    <h1 class="text-white font-bold text-lg leading-tight tracking-wide">BRGF<br><span class="text-xs text-primary font-medium">Reporting System</span></h1>
+                </div>
+                <button @click="mobileMenuOpen = !mobileMenuOpen" class="md:hidden text-slate-300 hover:text-white">
+                    <i class="fas" :class="mobileMenuOpen ? 'fa-times' : 'fa-bars'"></i>
+                </button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-4 space-y-1" :class="mobileMenuOpen ? 'block' : 'hidden md:block'">
+                <div class="mb-4">
+                    <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 block">Tahun Aktif</label>
+                    <div class="flex gap-2">
+                        <select v-model="currentYear" class="bg-slate-800 text-white text-sm rounded border border-slate-700 p-2 flex-1 outline-none focus:border-primary">
+                            <option v-for="y in years" :key="y" :value="y">{{ y }}</option>
+                        </select>
+                        <button @click="addYear" class="bg-slate-700 hover:bg-slate-600 text-white p-2 rounded border border-slate-600" title="Tambah Tahun">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="border-t border-slate-700 my-4"></div>
+                <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 block">Menu Utama</label>
+                
+                <nav-item icon="fa-chart-pie" text="Dashboard" :active="currentTab === 'dashboard'" @click="changeTab('dashboard')"></nav-item>
+                <nav-item icon="fa-file-signature" text="Stage 1: Aduan" :active="currentTab === 'stage1'" @click="changeTab('stage1')"></nav-item>
+                <nav-item icon="fa-tools" text="Stage 2: Kerja Siasatan" :active="currentTab === 'stage2'" @click="changeTab('stage2')"></nav-item>
+                <nav-item icon="fa-hard-hat" text="Stage 3: Projek Pembaikan" :active="currentTab === 'stage3'" @click="changeTab('stage3')"></nav-item>
+                <nav-item icon="fa-comments" text="Khidmat Nasihat" :active="currentTab === 'khidmat'" @click="changeTab('khidmat')"></nav-item>
+                <nav-item icon="fa-arrow-up-right-dots" text="Naik Taraf (Geoteknik)" :active="currentTab === 'naiktaraf'" @click="changeTab('naiktaraf')"></nav-item>
+                
+                <div class="border-t border-slate-700 my-4"></div>
+                <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 block">Tetapan</label>
+                <button @click="showPersonnelModal = true" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors text-slate-400 hover:text-white hover:bg-slate-800 text-left">
+                    <i class="fas fa-users-gear w-5 text-center"></i> Urus Pegawai
+                </button>
+            </div>
+            
+            <div class="p-4 text-xs text-center text-slate-500 no-print">
+                &copy; {{ new Date().getFullYear() }} BRGF Geoteknik
+            </div>
+        </aside>
+
+        <main class="flex-1 flex flex-col h-full bg-slate-50 overflow-hidden relative">
+            
+            <!-- Topbar -->
+            <header class="bg-white border-b border-slate-200 px-6 py-4 flex flex-wrap justify-between items-center z-10 no-print gap-4 shadow-sm">
+                <h2 class="text-xl font-semibold text-slate-800 capitalize flex items-center gap-2">
+                    <span v-if="currentView === 'form'"><button @click="currentView = 'list'" class="text-slate-400 hover:text-slate-700 mr-2"><i class="fas fa-arrow-left"></i></button></span>
+                    {{ getTabTitle() }} <span class="text-sm font-normal text-slate-500 bg-slate-100 px-2 py-1 rounded-full border border-slate-200">Tahun {{ currentYear }}</span>
+                </h2>
+                <div class="flex items-center gap-2 flex-wrap justify-end">
+                    <select v-if="currentTab !== 'dashboard' && currentView === 'list'" v-model="filterStatus" class="border border-slate-300 rounded-lg text-sm py-2 px-3 focus:ring-2 focus:ring-primary focus:border-primary transition-all bg-white max-w-[160px] truncate text-slate-600">
+                        <option value="">Semua Status</option>
+                        <option v-for="st in availableStatuses" :key="st" :value="st">{{ st }}</option>
+                    </select>
+                    <select v-if="currentTab === 'stage1' && currentView === 'list'" v-model="filterPic" class="border border-slate-300 rounded-lg text-sm py-2 px-3 focus:ring-2 focus:ring-primary focus:border-primary transition-all bg-white max-w-[160px] truncate text-slate-600">
+                        <option value="">Semua PIC</option>
+                        <option v-for="pic in lists.personnel" :key="pic" :value="pic">{{ pic }}</option>
+                    </select>
+                    <div v-if="currentTab !== 'dashboard' && currentView === 'list'" class="relative">
+                        <input type="text" v-model="searchQuery" placeholder="Carian..." class="pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary w-48 transition-all">
+                        <i class="fas fa-search absolute left-3 top-2.5 text-slate-400"></i>
+                    </div>
+                    
+                    <button v-if="currentTab !== 'dashboard' && currentView === 'list'" @click="exportToCSV()" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-medium py-2 px-3 rounded-lg text-sm transition-colors shadow-sm flex items-center gap-2" title="Eksport ke Excel/CSV">
+                        <i class="fas fa-file-csv"></i> <span class="hidden md:inline">Eksport</span>
+                    </button>
+                    
+                    <button @click="window.print()" class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-medium py-2 px-4 rounded-lg text-sm transition-colors shadow-sm flex items-center gap-2">
+                        <i class="fas fa-print"></i> Cetak
+                    </button>
+                    <button v-if="currentTab !== 'dashboard' && currentView === 'list'" @click="openForm()" class="bg-primary hover:bg-sky-600 text-white font-medium py-2 px-4 rounded-lg text-sm transition-colors shadow-sm flex items-center gap-2">
+                        <i class="fas fa-plus"></i> Tambah Rekod
+                    </button>
+                </div>
+            </header>
+
+            <div class="flex-1 overflow-y-auto p-4 md:p-6 pb-24 print:p-0">
+                
+                <div v-if="notification.show" class="fixed top-4 right-4 z-50 flex items-center p-4 mb-4 rounded-lg shadow-lg transition-all duration-300" :class="notification.isError ? 'bg-red-50 text-red-800 border border-red-200' : 'bg-green-50 text-green-800 border border-green-200'" role="alert">
+                    <i class="fas mr-3" :class="notification.isError ? 'fa-exclamation-circle' : 'fa-check-circle'"></i>
+                    <div class="text-sm font-medium">{{ notification.message }}</div>
+                </div>
+
+                <div v-if="currentTab === 'dashboard'" class="space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <stat-card title="Jumlah Aduan (Stage 1)" :value="stats.stage1.total" icon="fa-file-signature" color="text-blue-600" bg="bg-blue-100"></stat-card>
+                        <stat-card title="Kerja Siasatan (Stage 2)" :value="stats.stage2.total" icon="fa-tools" color="text-amber-600" bg="bg-amber-100"></stat-card>
+                        <stat-card title="Projek Pembaikan (Stage 3)" :value="stats.stage3.total" icon="fa-hard-hat" color="text-emerald-600" bg="bg-emerald-100"></stat-card>
+                        <stat-card title="Projek Naik Taraf" :value="stats.naiktaraf.total" icon="fa-arrow-up-right-dots" color="text-purple-600" bg="bg-purple-100"></stat-card>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div class="bg-white rounded-xl shadow-md border border-slate-200 p-6 print-break-inside-avoid lg:col-span-3">
+                            <h3 class="text-lg font-bold text-slate-800 mb-4 border-b pb-3">Ringkasan Stage 1</h3>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-base text-left border-collapse border border-slate-200">
+                                    <thead class="bg-slate-100 text-slate-700 text-sm">
+                                        <tr>
+                                            <th rowspan="2" class="border border-slate-300 p-2 align-middle text-center">Bulan</th>
+                                            <th rowspan="2" class="border border-slate-300 p-2 align-middle text-center">Jum Aduan</th>
+                                            <th colspan="2" class="border border-slate-300 p-2 text-center">Status Lawatan</th>
+                                            <th colspan="2" class="border border-slate-300 p-2 text-center">Maklum Balas (Hari)</th>
+                                            <th rowspan="2" class="border border-slate-300 p-2 align-middle text-center">Penyediaan</th>
+                                            <th colspan="2" class="border border-slate-300 p-2 text-center">Siap Laporan (Hari)</th>
+                                        </tr>
+                                        <tr>
+                                            <th class="border border-slate-300 p-2 text-center text-xs text-slate-500">Belum</th>
+                                            <th class="border border-slate-300 p-2 text-center text-xs text-green-600">Selesai</th>
+                                            <th class="border border-slate-300 p-2 text-center text-xs text-green-600">&le; 3</th>
+                                            <th class="border border-slate-300 p-2 text-center text-xs text-red-500">&gt; 3</th>
+                                            <th class="border border-slate-300 p-2 text-center text-xs text-green-600">&le; 21</th>
+                                            <th class="border border-slate-300 p-2 text-center text-xs text-red-500">&gt; 21</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr class="hover:bg-slate-50 text-sm bg-orange-50/60 border-b-2 border-slate-200">
+                                            <td class="border border-slate-200 p-2 font-semibold text-slate-700 text-center text-xs">Baki Aduan<br>Tahun Sebelum</td>
+                                            <td class="border border-slate-200 p-2 text-center font-bold text-slate-800">{{ stats.stage1.baki.jumlah }}</td>
+                                            <td class="border border-slate-200 p-2 text-center text-slate-600">{{ stats.stage1.baki.belumLawatan }}</td>
+                                            <td class="border border-slate-200 p-2 text-center text-green-600 font-medium">{{ stats.stage1.baki.selesaiLawatan }}</td>
+                                            <td class="border border-slate-200 p-2 text-center text-green-600 font-medium">{{ stats.stage1.baki.mbKurang3 }}</td>
+                                            <td class="border border-slate-200 p-2 text-center text-red-500 font-medium">{{ stats.stage1.baki.mbLebih3 }}</td>
+                                            <td class="border border-slate-200 p-2 text-center text-slate-600 font-medium">{{ stats.stage1.baki.penyediaan }}</td>
+                                            <td class="border border-slate-200 p-2 text-center text-green-600 font-medium">{{ stats.stage1.baki.lapKurang21 }}</td>
+                                            <td class="border border-slate-200 p-2 text-center text-red-500 font-medium">{{ stats.stage1.baki.lapLebih21 }}</td>
+                                        </tr>
+                                        <tr v-for="m in stats.stage1.monthly" :key="m.bulan" class="hover:bg-slate-50 text-sm">
+                                            <td class="border border-slate-200 p-2 font-medium text-slate-700 text-center">{{ m.bulan }}</td>
+                                            <td class="border border-slate-200 p-2 text-center font-bold text-slate-800">{{ m.jumlah }}</td>
+                                            <td class="border border-slate-200 p-2 text-center text-slate-600">{{ m.belumLawatan }}</td>
+                                            <td class="border border-slate-200 p-2 text-center text-green-600 font-medium">{{ m.selesaiLawatan }}</td>
+                                            <td class="border border-slate-200 p-2 text-center text-green-600 font-medium">{{ m.mbKurang3 }}</td>
+                                            <td class="border border-slate-200 p-2 text-center text-red-500 font-medium">{{ m.mbLebih3 }}</td>
+                                            <td class="border border-slate-200 p-2 text-center text-slate-600 font-medium">{{ m.penyediaan }}</td>
+                                            <td class="border border-slate-200 p-2 text-center text-green-600 font-medium">{{ m.lapKurang21 }}</td>
+                                            <td class="border border-slate-200 p-2 text-center text-red-500 font-medium">{{ m.lapLebih21 }}</td>
+                                        </tr>
+                                    </tbody>
+                                    <tfoot class="bg-slate-200 font-bold text-slate-800 text-sm border-t-2 border-slate-400">
+                                        <tr>
+                                            <td class="border border-slate-300 p-2 text-right">JUMLAH KESELURUHAN:</td>
+                                            <td class="border border-slate-300 p-2 text-center">{{ stats.stage1.total }}</td>
+                                            <td class="border border-slate-300 p-2 text-center text-slate-700">{{ stats.stage1.belumLawatan }}</td>
+                                            <td class="border border-slate-300 p-2 text-center text-green-700">{{ stats.stage1.selesaiLawatan }}</td>
+                                            <td class="border border-slate-300 p-2 text-center text-green-700">{{ stats.stage1.maklumBalasKurang3 }}</td>
+                                            <td class="border border-slate-300 p-2 text-center text-red-600">{{ stats.stage1.maklumBalasLebih3 }}</td>
+                                            <td class="border border-slate-300 p-2 text-center">{{ stats.stage1.statusCounts['penyediaan'] || 0 }}</td>
+                                            <td class="border border-slate-300 p-2 text-center text-green-700">{{ stats.stage1.laporanKurang21 }}</td>
+                                            <td class="border border-slate-300 p-2 text-center text-red-600">{{ stats.stage1.laporanLebih21 }}</td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 print-break-inside-avoid lg:col-span-3">
+                            <h3 class="font-bold text-slate-700 mb-4 border-b pb-2 flex items-center gap-2">
+                                <i class="fas fa-tasks text-blue-500"></i> Status Siasatan & Projek
+                            </h3>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                                <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+                                    <div class="flex justify-between items-center mb-3 border-b border-slate-200 pb-2">
+                                        <span class="text-xs font-bold text-amber-700 uppercase tracking-wide"><i class="fas fa-tools mr-1.5"></i> Stage 2: Siasatan</span>
+                                        <span class="text-xs font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-md shadow-sm">Jum: {{ stats.stage2.total }}</span>
+                                    </div>
+                                    <div class="flex flex-wrap gap-2">
+                                        <status-badge label="Baru" :count="stats.stage2.statusCounts['Baru']"></status-badge>
+                                        <status-badge label="Lantikan" :count="stats.stage2.statusCounts['Lantikan']" color="blue"></status-badge>
+                                        <status-badge label="Pelaksanaan" :count="stats.stage2.statusCounts['Pelaksanaan']" color="amber"></status-badge>
+                                        <status-badge label="Analisa Data" :count="stats.stage2.statusCounts['Analisa Data & Laporan']" color="purple"></status-badge>
+                                        <status-badge label="Selesai" :count="stats.stage2.statusCounts['Selesai']" color="green"></status-badge>
+                                    </div>
+                                </div>
+                                <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+                                    <div class="flex justify-between items-center mb-3 border-b border-slate-200 pb-2">
+                                        <span class="text-xs font-bold text-emerald-700 uppercase tracking-wide"><i class="fas fa-hard-hat mr-1.5"></i> Stage 3: Pembaikan</span>
+                                        <span class="text-xs font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md shadow-sm">Jum: {{ stats.stage3.total }}</span>
+                                    </div>
+                                    <div class="flex flex-wrap gap-2">
+                                        <status-badge label="Penyediaan" :count="stats.stage3.statusCounts['Penyediaan Skop & Lukisan']"></status-badge>
+                                        <status-badge label="Iklan & Tender" :count="stats.stage3.statusCounts['Iklan & Tender']" color="blue"></status-badge>
+                                        <status-badge label="Pembinaan" :count="stats.stage3.statusCounts['Dalam Pembinaan']" color="amber"></status-badge>
+                                        <status-badge label="Siap" :count="stats.stage3.statusCounts['Siap']" color="green"></status-badge>
+                                    </div>
+                                </div>
+                                <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+                                    <div class="flex justify-between items-center mb-3 border-b border-slate-200 pb-2">
+                                        <span class="text-xs font-bold text-purple-700 uppercase tracking-wide"><i class="fas fa-arrow-up-right-dots mr-1.5"></i> Naik Taraf</span>
+                                        <span class="text-xs font-bold bg-purple-100 text-purple-800 px-2 py-0.5 rounded-md shadow-sm">Jum: {{ stats.naiktaraf.total }}</span>
+                                    </div>
+                                    <div class="flex flex-wrap gap-2">
+                                        <status-badge label="Penyediaan" :count="stats.naiktaraf.statusCounts['Penyediaan Skop & Lukisan']"></status-badge>
+                                        <status-badge label="Iklan & Tender" :count="stats.naiktaraf.statusCounts['Iklan & Tender']" color="blue"></status-badge>
+                                        <status-badge label="Pembinaan" :count="stats.naiktaraf.statusCounts['Dalam Pembinaan']" color="amber"></status-badge>
+                                        <status-badge label="Siap" :count="stats.naiktaraf.statusCounts['Siap']" color="green"></status-badge>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 print-break-inside-avoid flex flex-col lg:col-span-1">
+                            <h3 class="font-bold text-slate-700 mb-4 border-b pb-2 flex items-center gap-2">
+                                <i class="fas fa-comments text-teal-600"></i> Khidmat Nasihat
+                            </h3>
+                            <div class="grid grid-cols-2 gap-2 mt-auto">
+                                <div class="bg-gradient-to-b from-slate-50 to-slate-100 border border-slate-200 p-2 rounded-xl text-center flex flex-col items-center justify-center relative overflow-hidden group hover:shadow-md transition-all col-span-2 min-h-[70px]">
+                                    <div class="text-2xl font-black text-slate-700 relative z-10">{{ stats.khidmat.total }}</div>
+                                    <div class="text-[10px] text-slate-600 font-bold uppercase mt-0.5">Jumlah</div>
+                                </div>
+                                <div class="bg-gradient-to-b from-gray-50 to-gray-100 border border-gray-200 p-2 rounded-xl text-center flex flex-col items-center justify-center relative overflow-hidden group hover:shadow-md transition-all min-h-[60px]">
+                                    <div class="text-xl font-black text-gray-700 relative z-10">{{ stats.khidmat.statusCounts['baru'] || 0 }}</div>
+                                    <div class="text-[9px] text-gray-600 font-bold uppercase mt-0.5">Baru</div>
+                                </div>
+                                <div class="bg-gradient-to-b from-blue-50 to-blue-100 border border-blue-200 p-2 rounded-xl text-center flex flex-col items-center justify-center relative overflow-hidden group hover:shadow-md transition-all min-h-[60px]">
+                                    <div class="text-xl font-black text-blue-700 relative z-10">{{ stats.khidmat.statusCounts['lawatan'] || 0 }}</div>
+                                    <div class="text-[9px] text-blue-700 font-bold uppercase mt-0.5">Lawatan</div>
+                                </div>
+                                <div class="bg-gradient-to-b from-purple-50 to-purple-100 border border-purple-200 p-2 rounded-xl text-center flex flex-col items-center justify-center relative overflow-hidden group hover:shadow-md transition-all min-h-[60px]">
+                                    <div class="text-xl font-black text-purple-700 relative z-10">{{ stats.khidmat.statusCounts['penyediaan'] || 0 }}</div>
+                                    <div class="text-[9px] text-purple-700 font-bold uppercase mt-0.5">Penyediaan</div>
+                                </div>
+                                <div class="bg-gradient-to-b from-emerald-50 to-emerald-100 border border-emerald-200 p-2 rounded-xl text-center flex flex-col items-center justify-center relative overflow-hidden group hover:shadow-md transition-all min-h-[60px]">
+                                    <div class="text-xl font-black text-emerald-700 relative z-10">{{ stats.khidmat.statusCounts['selesai'] || 0 }}</div>
+                                    <div class="text-[9px] text-emerald-700 font-bold uppercase mt-0.5">Selesai</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 print-break-inside-avoid flex flex-col lg:col-span-2">
+                            <h3 class="font-bold text-slate-700 mb-1 border-b pb-2 flex items-center gap-2">
+                                <i class="fas fa-smile text-amber-500"></i> Kajian Kepuasan Pelanggan
+                            </h3>
+                            <p class="text-xs text-slate-500 mb-4">(Berdasarkan aduan Stage 1 berstatus selesai)</p>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-5 flex-1">
+                                <div class="bg-blue-50/50 border border-blue-100 rounded-lg p-4 flex flex-col justify-center gap-3">
+                                    <div class="flex justify-between items-center border-b border-blue-200/60 pb-2">
+                                        <span class="text-slate-600 text-sm font-medium">Aduan Selesai:</span>
+                                        <strong class="text-slate-800 text-xl">{{ stats.csat.totalEligible }}</strong>
+                                    </div>
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-slate-600 text-sm font-medium">Borang Diterima:</span>
+                                        <strong class="text-blue-700 text-xl">{{ stats.csat.received }}</strong>
+                                    </div>
+                                    <div class="w-full bg-blue-200/50 rounded-full h-2.5 mt-1 overflow-hidden">
+                                        <div class="bg-blue-500 h-2.5 rounded-full transition-all duration-500" :style="'width: ' + (stats.csat.totalEligible > 0 ? (stats.csat.received / stats.csat.totalEligible * 100) : 0) + '%'"></div>
+                                    </div>
+                                </div>
+                                
+                                <div class="flex flex-col h-full">
+                                    <div class="flex-1 overflow-y-auto max-h-[120px] text-sm bg-red-50/40 border border-red-100 rounded-lg p-3" v-if="stats.csat.missingList.length > 0">
+                                        <div class="text-xs text-red-600 font-bold mb-2 flex items-start gap-1.5 border-b border-red-100 pb-2">
+                                            <i class="fas fa-exclamation-triangle mt-0.5"></i>
+                                            <span>Borang Belum Diterima:</span>
+                                        </div>
+                                        <ul class="list-disc pl-5 text-slate-600 space-y-1 text-xs">
+                                            <li v-for="noAduan in stats.csat.missingList" :key="noAduan">{{ noAduan }}</li>
+                                        </ul>
+                                    </div>
+                                    <div v-else class="text-sm text-green-600 font-medium text-center p-4 bg-green-50/50 rounded-lg border border-green-100 flex flex-col items-center justify-center h-full">
+                                        <i class="fas fa-check-circle text-2xl mb-2 text-green-500"></i>
+                                        <span>Semua borang kepuasan telah diterima bagi aduan yang selesai.</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <div v-if="currentTab !== 'dashboard' && currentView === 'list'" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left">
+                            <thead class="text-xs text-slate-600 bg-slate-100 uppercase border-b border-slate-200">
+                                <tr>
+                                    <th class="px-4 py-3 w-16">Bil</th>
+                                    <th class="px-4 py-3" v-if="currentTab === 'stage1' || currentTab === 'khidmat'">No Aduan / Perihal</th>
+                                    <th class="px-4 py-3" v-if="currentTab === 'stage2'">No Laporan S.I</th>
+                                    <th class="px-4 py-3" v-if="currentTab === 'stage3' || currentTab === 'naiktaraf'">No Projek</th>
+                                    
+                                    <th class="px-4 py-3">Lokasi (Daerah/Negeri)</th>
+                                    
+                                    <th class="px-4 py-3" v-if="currentTab !== 'khidmat'">HOPT</th>
+                                    <th class="px-4 py-3" v-if="currentTab === 'khidmat'">Pelanggan</th>
+                                    
+                                    <th class="px-4 py-3">PIC</th>
+                                    <th class="px-4 py-3">Status</th>
+                                    <th class="px-4 py-3 text-right no-print">Tindakan</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="(item, index) in filteredList" :key="item.id" class="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                                    <td class="px-4 py-3 font-medium text-slate-900">{{ index + 1 }}</td>
+                                    
+                                    <td class="px-4 py-3" v-if="currentTab === 'stage1' || currentTab === 'khidmat'">
+                                        <div class="font-semibold text-primary">{{ item.noAduan || 'Belum Dijana' }}</div>
+                                        <div class="text-xs text-slate-500 truncate max-w-[200px]" :title="item.perihal">{{ item.perihal || '-' }}</div>
+                                    </td>
+                                    
+                                    <td class="px-4 py-3 font-semibold text-primary" v-if="currentTab === 'stage2'">{{ item.noLaporan || 'Belum Dijana' }}</td>
+                                    <td class="px-4 py-3 font-semibold text-primary" v-if="currentTab === 'stage3' || currentTab === 'naiktaraf'">{{ item.noProjek || '-' }}</td>
+                                    
+                                    <td class="px-4 py-3">
+                                        {{ item.daerah || '-' }}<br>
+                                        <span class="text-xs text-slate-500">{{ item.negeri || '-' }}</span>
+                                    </td>
+                                    
+                                    <td class="px-4 py-3" v-if="currentTab !== 'khidmat'">{{ item.hopt || '-' }}</td>
+                                    <td class="px-4 py-3" v-if="currentTab === 'khidmat'">{{ item.pelanggan || '-' }}</td>
+                                    
+                                    <td class="px-4 py-3">
+                                        <div class="flex -space-x-2">
+                                            <div v-for="pic in (item.pics || []).slice(0,3)" :key="pic" class="w-8 h-8 rounded-full bg-slate-200 border-2 border-white flex items-center justify-center text-xs font-bold text-slate-600" :title="pic">
+                                                {{ pic.substring(0,2).toUpperCase() }}
+                                            </div>
+                                        </div>
+                                    </td>
+                                    
+                                    <td class="px-4 py-3">
+                                        <span class="px-2 py-1 text-xs font-medium rounded-full border bg-opacity-10 whitespace-nowrap" :class="getStatusColor(item.status_auto || item.status)">
+                                            {{ item.status_auto || item.status || 'Baru' }}
+                                        </span>
+                                    </td>
+                                    
+                                    <td class="px-4 py-3 text-right no-print">
+                                        <div class="flex justify-end gap-2">
+                                            <button @click="carryForward(item)" class="text-emerald-600 hover:bg-emerald-50 p-1.5 rounded" title="Bawa ke tahun hadapan"><i class="fas fa-share"></i></button>
+                                            <button @click="editItem(item)" class="text-blue-600 hover:bg-blue-50 p-1.5 rounded" title="Kemaskini"><i class="fas fa-edit"></i></button>
+                                            <button @click="deleteConfirm(item)" class="text-red-600 hover:bg-red-50 p-1.5 rounded" title="Padam"><i class="fas fa-trash"></i></button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr v-if="filteredList.length === 0">
+                                    <td colspan="10" class="px-4 py-8 text-center text-slate-500">Tiada rekod ditemui untuk tahun {{ currentYear }}.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div v-if="currentView === 'form'" class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 no-print max-w-5xl mx-auto">
+                    <h3 class="text-lg font-bold text-slate-800 mb-6 pb-2 border-b">{{ formMode === 'add' ? 'Tambah Rekod Baru' : 'Kemaskini Rekod' }} - {{ getTabTitle() }}</h3>
+                    
+                    <form @submit.prevent="saveForm" class="space-y-6">
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 p-4 rounded-lg border border-slate-100">
+                            <h4 class="col-span-full text-sm font-bold text-slate-700 uppercase tracking-wide">Maklumat Asas</h4>
+                            
+                            <div v-if="['stage3', 'naiktaraf'].includes(currentTab)">
+                                <label class="block text-sm font-medium text-slate-700 mb-1">No Projek <span class="text-red-500">*</span></label>
+                                <input type="text" v-model="formData.noProjek" required class="w-full border-slate-300 rounded-md shadow-sm focus:border-primary focus:ring-primary sm:text-sm p-2 border">
+                            </div>
+                            
+                            <div v-if="['stage1', 'khidmat'].includes(currentTab)" class="col-span-full">
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Perihal Aduan <span class="text-red-500">*</span></label>
+                                <textarea v-model="formData.perihal" required rows="2" class="w-full border-slate-300 rounded-md shadow-sm focus:border-primary focus:ring-primary sm:text-sm p-2 border"></textarea>
+                            </div>
+                            
+                            <div v-if="['stage2', 'stage3', 'naiktaraf'].includes(currentTab)">
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Tarikh Laporan Aduan Dikeluarkan</label>
+                                <input type="date" v-model="formData.tarikhLaporanAduan" class="w-full border-slate-300 rounded-md shadow-sm p-2 border">
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Negeri <span class="text-red-500">*</span></label>
+                                <select v-model="formData.negeri" required class="w-full border-slate-300 rounded-md shadow-sm p-2 border bg-white">
+                                    <option value="">-- Pilih Negeri --</option>
+                                    <option v-for="n in lists.negeri" :key="n" :value="n">{{ n }}</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Daerah <span class="text-red-500">*</span></label>
+                                <input type="text" v-model="formData.daerah" required class="w-full border-slate-300 rounded-md shadow-sm p-2 border bg-white" placeholder="Sila isi daerah">
+                            </div>
+                            
+                            <div v-if="currentTab !== 'khidmat'">
+                                <label class="block text-sm font-medium text-slate-700 mb-1">HOPT</label>
+                                <input type="text" v-model="formData.hopt" class="w-full border-slate-300 rounded-md shadow-sm p-2 border">
+                            </div>
+                            <div v-if="currentTab === 'khidmat'">
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Pelanggan</label>
+                                <input type="text" v-model="formData.pelanggan" class="w-full border-slate-300 rounded-md shadow-sm p-2 border">
+                            </div>
+                            <div v-if="['stage1', 'khidmat'].includes(currentTab)">
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Pemilik</label>
+                                <input type="text" v-model="formData.pemilik" class="w-full border-slate-300 rounded-md shadow-sm p-2 border">
+                            </div>
+
+                            <div class="col-span-full">
+                                <label class="block text-sm font-medium text-slate-700 mb-1 flex justify-between">
+                                    <span>Person In Charge (Maksimum 3)</span>
+                                    <span class="text-xs font-normal" :class="(formData.pics || []).length >= 3 ? 'text-red-500' : 'text-slate-500'">Terpilih: {{ (formData.pics || []).length }}/3</span>
+                                </label>
+                                <div class="flex flex-wrap gap-2 p-3 border rounded-md bg-white border-slate-300 min-h-[50px]">
+                                    <label v-for="person in lists.personnel" :key="person" class="inline-flex items-center text-sm border rounded px-2 py-1 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors" :class="{'border-primary bg-sky-50': (formData.pics || []).includes(person)}">
+                                        <input type="checkbox" :value="person" v-model="formData.pics" :disabled="(formData.pics || []).length >= 3 && !(formData.pics || []).includes(person)" class="hidden">
+                                        <i class="fas mr-1 text-xs" :class="(formData.pics || []).includes(person) ? 'fa-check text-primary' : 'fa-plus text-slate-300'"></i> {{ person }}
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div v-if="currentTab === 'stage1'" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-sm text-slate-700 mb-1">Kategori Masalah</label>
+                                <select v-model="formData.masalah" class="w-full border-slate-300 rounded-md shadow-sm p-2 border bg-white">
+                                    <option v-for="m in lists.masalah" :key="m" :value="m">{{ m }}</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm text-slate-700 mb-1">Impak</label>
+                                <select v-model="formData.impak" class="w-full border-slate-300 rounded-md shadow-sm p-2 border bg-white">
+                                    <option value="">-Pilih-</option><option value="kecil">Kecil</option><option value="besar">Besar</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm text-slate-700 mb-1">Punca Utama</label>
+                                <select v-model="formData.punca" class="w-full border-slate-300 rounded-md shadow-sm p-2 border bg-white">
+                                    <option v-for="p in lists.punca" :key="p" :value="p">{{ p }}</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div v-if="currentTab === 'stage1'" class="grid grid-cols-1 md:grid-cols-2 gap-6 bg-blue-50 p-4 rounded-lg border border-blue-100">
+                            <h4 class="col-span-full text-sm font-bold text-blue-800 uppercase tracking-wide">Jadual Pelaksanaan & Status (Stage 1)</h4>
+                            
+                            <div><label class="block text-sm text-slate-700 mb-1">Tarikh Terima Aduan</label><input type="date" v-model="formData.tarikhTerima" class="w-full border-slate-300 rounded-md shadow-sm p-2 border"></div>
+                            <div>
+                                <label class="block text-sm text-slate-700 mb-1">Tarikh Lawatan</label>
+                                <input type="date" v-model="formData.tarikhLawatan" class="w-full border-slate-300 rounded-md shadow-sm p-2 border" @change="generateAutoIdIfValid">
+                                <span class="text-xs text-blue-600 mt-1 block italic">* No Aduan dijana secara automatik selepas diisi.</span>
+                            </div>
+                            
+                            <div class="col-span-full border-t border-blue-200 my-2"></div>
+                            
+                            <div><label class="block text-sm text-slate-700 mb-1">Maklum Balas Awalan (Jadual)</label><input type="date" v-model="formData.maklumBalasJadual" class="w-full border-slate-300 rounded-md shadow-sm p-2 border"></div>
+                            <div><label class="block text-sm text-slate-700 mb-1">Maklum Balas Awalan (Sebenar)</label><input type="date" v-model="formData.maklumBalasSebenar" class="w-full border-slate-300 rounded-md shadow-sm p-2 border"></div>
+                            
+                            <div><label class="block text-sm text-slate-700 mb-1">Pengeluaran Laporan (Jadual)</label><input type="date" v-model="formData.laporanJadual" class="w-full border-slate-300 rounded-md shadow-sm p-2 border"></div>
+                            <div><label class="block text-sm text-slate-700 mb-1">Pengeluaran Laporan (Sebenar)</label><input type="date" v-model="formData.laporanSebenar" class="w-full border-slate-300 rounded-md shadow-sm p-2 border"></div>
+
+                            <div>
+                                <label class="block text-sm text-slate-700 mb-1">Status Laporan</label>
+                                <select v-model="formData.status" class="w-full border-slate-300 rounded-md shadow-sm p-2 border bg-white">
+                                    <option value="baru">Baru</option><option value="lawatan">Lawatan</option><option value="penyediaan">Penyediaan</option><option value="selesai">Selesai</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm text-slate-700 mb-1">Tarikh Terima Borang Kepuasan</label>
+                                <input type="date" v-model="formData.tarikhBorangKepuasan" class="w-full border-slate-300 rounded-md shadow-sm p-2 border">
+                            </div>
+                        </div>
+
+                        <div v-if="currentTab === 'stage1'" class="bg-amber-50 p-4 rounded-lg border border-amber-100">
+                            <h4 class="text-sm font-bold text-amber-800 uppercase tracking-wide mb-4">Cadangan Soil Investigation (S.I)</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-4 max-h-[300px] overflow-y-auto p-2 border bg-white rounded">
+                                <div v-for="(si, index) in formData.siList" :key="index" class="flex items-center gap-2 p-2 hover:bg-slate-50 rounded border border-transparent hover:border-slate-200">
+                                    <input type="checkbox" v-model="si.selected" class="w-4 h-4 text-primary bg-slate-100 border-slate-300 rounded">
+                                    <span class="text-sm text-slate-700 flex-1 truncate" :title="si.name">{{ si.name }}</span>
+                                    <input type="number" v-model="si.qty" min="0" :disabled="!si.selected" placeholder="Bil" class="w-16 border-slate-300 rounded-md p-1 border text-sm text-center">
+                                </div>
+                            </div>
+                            <div class="flex flex-wrap items-end gap-4">
+                                <div class="flex-1 min-w-[200px]">
+                                    <label class="block text-sm text-slate-700 mb-1">Tambah Jenis S.I Baru</label>
+                                    <div class="flex gap-2">
+                                        <input type="text" v-model="newSiType" placeholder="Nama ujian baru..." class="flex-1 border-slate-300 rounded-md p-2 border text-sm">
+                                        <button type="button" @click="addSiType" class="bg-amber-600 hover:bg-amber-700 text-white px-3 py-1.5 rounded-md text-sm whitespace-nowrap">Tambah</button>
+                                    </div>
+                                </div>
+                                <div class="w-full md:w-auto">
+                                    <label class="block text-sm font-bold text-slate-800 mb-1">Anggaran Harga Keseluruhan (RM)</label>
+                                    <input type="number" step="0.01" v-model="formData.anggaranHargaSI" placeholder="0.00" class="w-full md:w-48 border-slate-300 rounded-md p-2 border text-right font-semibold text-lg text-primary bg-white">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div v-if="currentTab === 'stage2'" class="grid grid-cols-1 md:grid-cols-2 gap-6 bg-amber-50 p-4 rounded-lg border border-amber-100">
+                            <h4 class="col-span-full text-sm font-bold text-amber-800 uppercase tracking-wide">Perincian Siasatan Tanah & Kewangan (Stage 2)</h4>
+                            
+                            <div><label class="block text-sm text-slate-700 mb-1">Tarikh Pengesahan Peruntukan</label><input type="date" v-model="formData.tarikhSahanPeruntukan" class="w-full border-slate-300 rounded-md p-2 border"></div>
+                            <div><label class="block text-sm text-slate-700 mb-1 font-bold">Peruntukan (RM) <span class="text-red-500">*</span></label><input type="number" step="0.01" v-model="formData.peruntukan" required class="w-full border-slate-300 rounded-md p-2 border text-right text-lg text-amber-700 font-semibold" placeholder="0.00"></div>
+                            
+                            <div class="col-span-full border-t border-amber-200 my-2"></div>
+                            
+                            <div><label class="block text-sm text-slate-700 mb-1">Tarikh Mohon Kontraktor</label><input type="date" v-model="formData.tarikhMohonKontraktor" class="w-full border-slate-300 rounded-md p-2 border"></div>
+                            <div><label class="block text-sm text-slate-700 mb-1">Nama Kontraktor</label><input type="text" v-model="formData.namaKontraktor" class="w-full border-slate-300 rounded-md p-2 border"></div>
+                            
+                            <div><label class="block text-sm text-slate-700 mb-1">Tarikh Mula Kerja</label><input type="date" v-model="formData.tarikhMulaKerja" class="w-full border-slate-300 rounded-md p-2 border"></div>
+                            <div><label class="block text-sm text-slate-700 mb-1">Tarikh Terima Laporan S.I</label><input type="date" v-model="formData.tarikhTerimaLaporanSI" class="w-full border-slate-300 rounded-md p-2 border"></div>
+                            
+                            <div><label class="block text-sm text-slate-700 mb-1">Tarikh Siap Laporan Akhir (Jadual)</label><input type="date" v-model="formData.tarikhSiapLaporanJadual" class="w-full border-slate-300 rounded-md p-2 border"></div>
+                            <div><label class="block text-sm text-slate-700 mb-1">Tarikh Siap Laporan Akhir (Sebenar)</label><input type="date" v-model="formData.tarikhSiapLaporanSebenar" class="w-full border-slate-300 rounded-md p-2 border"></div>
+                            
+                            <div class="col-span-full flex items-center justify-between bg-white p-3 rounded border">
+                                <span class="text-sm font-semibold text-slate-600">Status Semasa (Auto):</span>
+                                <span class="px-3 py-1 text-sm font-bold rounded-full border bg-opacity-10" :class="getStatusColor(calculateStage2Status(formData))">{{ calculateStage2Status(formData) }}</span>
+                            </div>
+                        </div>
+
+                        <div v-if="['stage3', 'naiktaraf'].includes(currentTab)" class="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 rounded-lg border" :class="currentTab === 'stage3' ? 'bg-emerald-50 border-emerald-100' : 'bg-purple-50 border-purple-100'">
+                            <h4 class="col-span-full text-sm font-bold uppercase tracking-wide" :class="currentTab === 'stage3' ? 'text-emerald-800' : 'text-purple-800'">Perincian Projek & Tarikh</h4>
+                            
+                            <div><label class="block text-sm text-slate-700 mb-1">Tarikh Pengesahan Peruntukan</label><input type="date" v-model="formData.tarikhSahanPeruntukan" class="w-full border-slate-300 rounded-md p-2 border"></div>
+                            <div><label class="block text-sm text-slate-700 mb-1 font-bold">Peruntukan (RM) <span class="text-red-500">*</span></label><input type="number" step="0.01" v-model="formData.peruntukan" required class="w-full border-slate-300 rounded-md p-2 border text-right text-lg font-semibold" :class="currentTab === 'stage3' ? 'text-emerald-700' : 'text-purple-700'" placeholder="0.00"></div>
+                            
+                            <div class="col-span-full border-t border-black/10 my-2"></div>
+                            
+                            <div><label class="block text-sm text-slate-700 mb-1">Tarikh Siap Laporan Akhir (Stage 2)</label><input type="date" v-model="formData.tarikhSiapLaporanAkhir" class="w-full border-slate-300 rounded-md p-2 border"></div>
+                            <div><label class="block text-sm text-slate-700 mb-1">Tarikh SST</label><input type="date" v-model="formData.tarikhSST" class="w-full border-slate-300 rounded-md p-2 border"></div>
+                            
+                            <div><label class="block text-sm text-slate-700 mb-1">Tarikh Mula Kerja</label><input type="date" v-model="formData.tarikhMulaKerja" class="w-full border-slate-300 rounded-md p-2 border"></div>
+                            <div><label class="block text-sm text-slate-700 mb-1">Tarikh Siap Kerja (Jadual)</label><input type="date" v-model="formData.tarikhSiapKerjaJadual" class="w-full border-slate-300 rounded-md p-2 border"></div>
+                            
+                            <div><label class="block text-sm text-slate-700 mb-1">Tarikh Siap Kerja (Sebenar)</label><input type="date" v-model="formData.tarikhSiapKerjaSebenar" class="w-full border-slate-300 rounded-md p-2 border"></div>
+                            
+                            <div class="col-span-full flex items-center justify-between bg-white p-3 rounded border">
+                                <span class="text-sm font-semibold text-slate-600">Status Projek (Auto):</span>
+                                <span class="px-3 py-1 text-sm font-bold rounded-full border bg-opacity-10" :class="getStatusColor(calculateProjectStatus(formData))">{{ calculateProjectStatus(formData) }}</span>
+                            </div>
+                        </div>
+
+                        <div v-if="currentTab === 'khidmat'" class="grid grid-cols-1 md:grid-cols-2 gap-6 bg-teal-50 p-4 rounded-lg border border-teal-100">
+                            <div><label class="block text-sm text-slate-700 mb-1">No Aduan</label><input type="text" v-model="formData.noAduanLuar" class="w-full border-slate-300 rounded-md p-2 border"></div>
+                            <div><label class="block text-sm text-slate-700 mb-1">Tarikh Terima Aduan</label><input type="date" v-model="formData.tarikhTerima" class="w-full border-slate-300 rounded-md p-2 border"></div>
+                            <div><label class="block text-sm text-slate-700 mb-1">Tarikh Lawatan</label><input type="date" v-model="formData.tarikhLawatan" class="w-full border-slate-300 rounded-md p-2 border"></div>
+                            <div><label class="block text-sm text-slate-700 mb-1">Maklum Balas (Sebenar)</label><input type="date" v-model="formData.maklumBalasSebenar" class="w-full border-slate-300 rounded-md p-2 border"></div>
+                            <div>
+                                <label class="block text-sm text-slate-700 mb-1">Status</label>
+                                <select v-model="formData.status" class="w-full border-slate-300 rounded-md p-2 border bg-white">
+                                    <option value="baru">Baru</option><option value="lawatan">Lawatan</option><option value="penyediaan">Penyediaan</option><option value="selesai">Selesai</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="col-span-full">
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Catatan Tambahan</label>
+                            <textarea v-model="formData.catatan" rows="2" class="w-full border-slate-300 rounded-md shadow-sm p-2 border"></textarea>
+                        </div>
+
+                        <div class="flex justify-end gap-3 pt-4 border-t border-slate-200">
+                            <button type="button" @click="currentView = 'list'" class="px-5 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50">Batal</button>
+                            <button type="submit" class="px-5 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-sky-600 shadow-sm flex items-center gap-2">
+                                <i class="fas fa-save"></i> Simpan Rekod
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+            </div>
+        </main>
+
+        <div v-if="showPersonnelModal" class="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
+            <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+                <h3 class="text-lg font-bold mb-4 flex justify-between items-center">
+                    Senarai Nama PIC
+                    <button @click="showPersonnelModal = false" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times"></i></button>
+                </h3>
+                <div class="flex gap-2 mb-4">
+                    <input type="text" v-model="newPersonnelName" placeholder="Nama pegawai baru..." class="flex-1 border border-slate-300 p-2 rounded text-sm focus:border-primary outline-none">
+                    <button @click="addPersonnel" class="bg-primary text-white px-4 py-2 rounded text-sm hover:bg-sky-600"><i class="fas fa-plus"></i></button>
+                </div>
+                <ul class="max-h-64 overflow-y-auto border rounded divide-y">
+                    <li v-for="(person, index) in lists.personnel" :key="index" class="p-3 flex justify-between items-center text-sm hover:bg-slate-50">
+                        <span>{{ person }}</span>
+                        <button @click="removePersonnel(index)" class="text-red-500 hover:bg-red-50 p-1.5 rounded"><i class="fas fa-trash"></i></button>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <div v-if="promptDialog.show" class="fixed inset-0 bg-black/50 z-[110] flex items-center justify-center p-4">
+            <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 text-center">
+                <h3 class="text-lg font-bold mb-2 text-slate-800">{{ promptDialog.title }}</h3>
+                <p class="text-sm text-slate-600 mb-4">{{ promptDialog.message }}</p>
+                <input type="text" v-model="promptDialog.input" class="w-full border border-slate-300 p-2 rounded text-sm focus:border-primary outline-none mb-6 text-center" :placeholder="promptDialog.placeholder">
+                <div class="flex gap-3 justify-center">
+                    <button @click="promptDialog.show = false" class="px-4 py-2 border rounded-lg text-sm font-medium hover:bg-slate-50">Batal</button>
+                    <button @click="promptDialog.action(promptDialog.input)" class="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-sky-600">Simpan</button>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="confirmDialog.show" class="fixed inset-0 bg-black/50 z-[110] flex items-center justify-center p-4">
+            <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 text-center">
+                <div class="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl" :class="confirmDialog.isDanger ? 'bg-red-100 text-red-500' : 'bg-primary/10 text-primary'">
+                    <i class="fas" :class="confirmDialog.isDanger ? 'fa-exclamation-triangle' : 'fa-question-circle'"></i>
+                </div>
+                <h3 class="text-lg font-bold mb-2 text-slate-800">{{ confirmDialog.title }}</h3>
+                <p class="text-sm text-slate-600 mb-6">{{ confirmDialog.message }}</p>
+                <div class="flex gap-3 justify-center">
+                    <button @click="confirmDialog.show = false" class="px-4 py-2 border rounded-lg text-sm font-medium hover:bg-slate-50">Batal</button>
+                    <button @click="confirmDialog.action()" class="px-4 py-2 text-white rounded-lg text-sm font-medium" :class="confirmDialog.isDanger ? 'bg-red-600 hover:bg-red-700' : 'bg-primary hover:bg-sky-600'">Ya, Teruskan</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Konfigurasi Firebase milik anda
+        const firebaseConfig = {
+            apiKey: "AIzaSyDm6309lus3AyqfFR1xM1aXY9RzrfalbFs",
+            authDomain: "sistem-pelaporan-brgf.firebaseapp.com",
+            projectId: "sistem-pelaporan-brgf",
+            storageBucket: "sistem-pelaporan-brgf.firebasestorage.app",
+            messagingSenderId: "592053476865",
+            appId: "1:592053476865:web:44e1ba109937b063462a00"
+        };
+
+        const appId = 'brgf-default-app';
+
+        // Block 'try...catch' ini akan menghalang sistem dari 'crash' jika berada di dalam Iframe/Sandbox
+        try {
+            const app = initializeApp(firebaseConfig);
+            window.fbDb = getFirestore(app);
+            window.fbAuth = getAuth(app);
+            window.fbAppId = appId;
+            
+            // Mendedahkan fungsi Firebase ke tahap global supaya Vue.js boleh menggunakannya
+            window.fbSetDoc = setDoc;
+            window.fbDeleteDoc = deleteDoc;
+            window.fbDoc = doc;
+            window.fbOnSnapshot = onSnapshot;
+            window.fbCollection = collection;
+
+            const initAuth = async () => {
+                try {
+                    const userCredential = await signInAnonymously(window.fbAuth);
+                    console.log("Successfully signed in anonymously:", userCredential.user.uid);
+                    window.dispatchEvent(new Event('firebase-auth-ready'));
+                } catch (error) {
+                    if (error.code === "auth/admin-restricted-operation") {
+                        window.authErrorMessage = "Sila aktifkan 'Anonymous Authentication' di Firebase Console anda.";
+                    } else {
+                        window.authErrorMessage = "Ralat Firebase Auth: " + error.message;
+                    }
+                    window.firebaseNotConfigured = true;
+                    window.dispatchEvent(new Event('firebase-auth-ready'));
+                }
+            };
+            
+            initAuth();
+            
+        } catch (error) {
+            // Tangkap ralat jika persekitaran (seperti Preview) menyekat pangkalan data
+            console.warn("Firebase disekat oleh persekitaran Sandbox/Iframe. Sistem berjalan luar talian.", error);
+            window.firebaseNotConfigured = true;
+            window.authErrorMessage = "Sistem berjalan secara Luar Talian di dalam paparan Preview ini.";
+            window.dispatchEvent(new Event('firebase-auth-ready'));
+        }
+    </script>
+
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script>
+        const { createApp, ref, computed, reactive, watch, onMounted } = Vue;
+
+        const NavItem = {
+            props: ['icon', 'text', 'active'],
+            template: `
+                <button class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all text-left mb-1" 
+                    :class="active ? 'bg-primary text-white shadow-md font-medium' : 'text-slate-400 hover:text-white hover:bg-slate-800'">
+                    <i class="fas w-5 text-center" :class="icon"></i> {{ text }}
+                </button>
+            `
+        };
+
+        const StatCard = {
+            props: ['title', 'value', 'icon', 'color', 'bg'],
+            template: `
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex items-center gap-4 print-break-inside-avoid">
+                    <div class="w-12 h-12 rounded-full flex items-center justify-center text-xl shrink-0" :class="[bg, color]">
+                        <i class="fas" :class="icon"></i>
+                    </div>
+                    <div>
+                        <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">{{ title }}</div>
+                        <div class="text-2xl font-bold text-slate-800">{{ value || 0 }}</div>
+                    </div>
+                </div>
+            `
+        };
+
+        const StatusBadge = {
+            props: ['label', 'count', 'color'],
+            template: `
+                <div class="flex items-center gap-2 border rounded-full pl-3 pr-1 py-1 text-sm bg-white" :class="borderColorClass">
+                    <span class="text-slate-600 font-medium whitespace-nowrap">{{ label }}</span>
+                    <span class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0" :class="bgColorClass">{{ count || 0 }}</span>
+                </div>
+            `,
+            computed: {
+                bgColorClass() {
+                    if (this.color === 'blue') return 'bg-blue-500';
+                    if (this.color === 'amber') return 'bg-amber-500';
+                    if (this.color === 'green') return 'bg-green-500';
+                    return 'bg-slate-500';
+                },
+                borderColorClass() {
+                    if (this.color === 'blue') return 'border-blue-200';
+                    if (this.color === 'amber') return 'border-amber-200';
+                    if (this.color === 'green') return 'border-green-200';
+                    return 'border-slate-200';
+                }
+            }
+        };
+
+        createApp({
+            components: { 'nav-item': NavItem, 'stat-card': StatCard, 'status-badge': StatusBadge },
+            setup() {
+                const activeYear = new Date().getFullYear().toString();
+                
+                const currentTab = ref('dashboard');
+                const currentView = ref('list');
+                const formMode = ref('add');
+                const mobileMenuOpen = ref(false);
+                const currentYear = ref(activeYear);
+                const years = ref([activeYear, (parseInt(activeYear)-1).toString()]);
+                const searchQuery = ref('');
+                const filterStatus = ref('');
+                const filterPic = ref('');
+                const notification = reactive({ show: false, message: '', isError: false });
+                
+                const siMasterList = [
+                    { name: 'Borehole', selected: false, qty: null }, { name: 'MP/JKR Probe', selected: false, qty: null },
+                    { name: 'CPTu', selected: false, qty: null }, { name: 'Parallel Seismic', selected: false, qty: null },
+                    { name: 'Trial Pit', selected: false, qty: null }, { name: 'Inclinometer', selected: false, qty: null },
+                    { name: 'Ground Settlement Marker', selected: false, qty: null }, { name: 'Building Settle Marker', selected: false, qty: null },
+                    { name: 'Tilt Monitoring', selected: false, qty: null }, { name: 'Van Shear Test', selected: false, qty: null },
+                    { name: 'Cone Penetration Test', selected: false, qty: null }, { name: 'Electrical Resistivity Tomography', selected: false, qty: null },
+                    { name: 'Ground Penetrating Radar', selected: false, qty: null }, { name: 'Dynamic Cone Penetrometer', selected: false, qty: null }
+                ];
+
+                const defaultFormData = () => ({
+                    id: null, pics: [], peruntukan: 0, anggaranHargaSI: 0, status: 'baru',
+                    siList: JSON.parse(JSON.stringify(siMasterList))
+                });
+                const formData = ref(defaultFormData());
+
+                const showPersonnelModal = ref(false);
+                const newPersonnelName = ref('');
+                const confirmDialog = reactive({ show: false, title: '', message: '', isDanger: true, action: null });
+                const promptDialog = reactive({ show: false, title: '', message: '', placeholder: '', input: '', action: null });
+                const newSiType = ref('');
+
+                const records = reactive({
+                    stage1: [], stage2: [], stage3: [], khidmat: [], naiktaraf: []
+                });
+
+                const lists = reactive({
+                    negeri: ['Johor', 'Kedah', 'Kelantan', 'Melaka', 'Negeri Sembilan', 'Pahang', 'Perak', 'Perlis', 'Pulau Pinang', 'Sabah', 'Sarawak', 'Selangor', 'Terengganu', 'W.P. Kuala Lumpur', 'W.P. Labuan', 'W.P. Putrajaya'],
+                    personnel: ['JAP', 'JAK', 'Hayatul Husna', 'Nazatul Fara’ain', 'Zairol', 'Azim', 'Syazwan', 'Rosiah', 'Nur Ashikin', 'Iswandi', 'Faridzuan', 'Bhavithra', 'Lukman'],
+                    masalah: ['Hakisan', 'Kegagalan Tembok Penahan', 'Kegagalan Asas', 'Ketidakstabilan Cerun', 'Lubang Benam', 'Mendapan', 'Resapan Air', 'Tanah Jerlus', 'Gegaran (Bukan Skop Geoteknik)'],
+                    punca: ['Rekabentuk', 'Kacau Ganggu', 'Kualiti Binaan', 'Semula Jadi', 'Penyenggaraan']
+                });
+
+                const showNotify = (msg, isErr = false) => {
+                    notification.message = msg;
+                    notification.isError = isErr;
+                    notification.show = true;
+                    setTimeout(() => notification.show = false, 4000);
+                };
+
+                const showConfirm = (title, message, isDanger, actionFn) => {
+                    confirmDialog.title = title;
+                    confirmDialog.message = message;
+                    confirmDialog.isDanger = isDanger;
+                    confirmDialog.action = actionFn;
+                    confirmDialog.show = true;
+                };
+
+                const showPrompt = (title, message, placeholder, actionFn) => {
+                    promptDialog.title = title;
+                    promptDialog.message = message;
+                    promptDialog.placeholder = placeholder;
+                    promptDialog.input = '';
+                    promptDialog.action = actionFn;
+                    promptDialog.show = true;
+                };
+
+                const changeTab = (tab) => { 
+                    currentTab.value = tab; 
+                    currentView.value = 'list'; 
+                    mobileMenuOpen.value = false; 
+                    filterStatus.value = ''; 
+                    filterPic.value = '';
+                };
+                
+                const getTabTitle = () => {
+                    const titles = { stage1: 'Stage 1: Aduan', stage2: 'Stage 2: Kerja-kerja Penyiasatan Tanah', stage3: 'Stage 3: Projek Pembaikan', khidmat: 'Khidmat Nasihat & Pakar', naiktaraf: 'Projek Naik Taraf (Skop Geoteknik)' };
+                    return titles[currentTab.value] || 'Dashboard';
+                };
+
+                const syncSettingsToFirebase = async () => {
+                    if (window.firebaseNotConfigured || !window.fbDb || !window.fbAuth?.currentUser) return;
+                    try {
+                        await window.fbSetDoc(window.fbDoc(window.fbDb, 'artifacts', window.fbAppId, 'public', 'data', 'settings', 'metadata'), {
+                            personnel: JSON.parse(JSON.stringify(lists.personnel)),
+                            years: JSON.parse(JSON.stringify(years.value))
+                        });
+                    } catch(e) { console.error("Error syncing settings", e); }
+                };
+
+                const addYear = () => {
+                    showPrompt('Tambah Tahun Aktif', 'Sila masukkan tahun baharu untuk diaktifkan.', 'Contoh: 2025', (ny) => {
+                        if (ny && !isNaN(ny) && ny.length === 4) {
+                            if (!years.value.includes(ny)) { 
+                                years.value.push(ny); 
+                                years.value.sort((a,b)=>b-a); 
+                                currentYear.value = ny; 
+                                showNotify("Tahun ditambah."); 
+                                promptDialog.show = false;
+                                syncSettingsToFirebase();
+                            }
+                            else showNotify("Tahun sudah wujud.", true);
+                        } else {
+                            showNotify("Sila masukkan 4 digit tahun yang sah.", true);
+                        }
+                    });
+                };
+
+                const addPersonnel = () => {
+                    if (newPersonnelName.value.trim() && !lists.personnel.includes(newPersonnelName.value)) {
+                        lists.personnel.push(newPersonnelName.value.trim()); 
+                        newPersonnelName.value = '';
+                        syncSettingsToFirebase();
+                    }
+                };
+                
+                const removePersonnel = (index) => { 
+                    showConfirm('Padam Pegawai', 'Adakah anda pasti untuk membuang pegawai ini dari senarai?', true, () => {
+                        lists.personnel.splice(index, 1);
+                        confirmDialog.show = false;
+                        syncSettingsToFirebase();
+                    });
+                };
+
+                const addSiType = () => {
+                    if (newSiType.value.trim()) {
+                        formData.value.siList.push({ name: newSiType.value.trim(), selected: true, qty: 1 });
+                        newSiType.value = '';
+                    }
+                };
+
+                // Auto Generation Logics
+                const generateAutoIdIfValid = () => {
+                    if (currentTab.value === 'stage1' && formData.value.tarikhLawatan && !formData.value.noAduan) {
+                        const currentCount = records.stage1.filter(r => r.year === currentYear.value && r.noAduan).length + 1;
+                        formData.value.noAduan = `CKG/BRGF/${currentYear.value}/${String(currentCount).padStart(3, '0')}`;
+                    }
+                };
+
+                const generateStage2Id = () => {
+                    const currentCount = records.stage2.filter(r => r.year === currentYear.value).length + 1;
+                    return `CKG/BRGF-LA/${currentYear.value}-${String(currentCount).padStart(3, '0')}`;
+                };
+
+                const calculateStage2Status = (item) => {
+                    if (item.tarikhSiapLaporanSebenar) return 'Selesai';
+                    if (item.tarikhTerimaLaporanSI) return 'Analisa Data & Laporan';
+                    if (item.tarikhMulaKerja) return 'Pelaksanaan';
+                    if (item.tarikhMohonKontraktor) return 'Lantikan';
+                    return 'Baru';
+                };
+
+                const calculateProjectStatus = (item) => {
+                    if (item.tarikhSiapKerjaSebenar) return 'Siap';
+                    if (item.tarikhMulaKerja) return 'Dalam Pembinaan';
+                    if (item.tarikhSahanPeruntukan && !item.tarikhMulaKerja) {
+                        if(item.tarikhSST) return 'Iklan & Tender';
+                        return 'Penyediaan Skop & Lukisan';
+                    }
+                    if (!item.tarikhSahanPeruntukan && !item.tarikhMulaKerja && item.id) return 'Iklan & Tender'; 
+                    return 'Baru';
+                };
+
+                const openForm = () => {
+                    formMode.value = 'add';
+                    formData.value = defaultFormData();
+                    currentView.value = 'form';
+                };
+
+                const editItem = (item) => {
+                    formMode.value = 'edit';
+                    formData.value = JSON.parse(JSON.stringify(item));
+                    if(!formData.value.pics || !Array.isArray(formData.value.pics)) formData.value.pics = [];
+                    if(!formData.value.siList) formData.value.siList = JSON.parse(JSON.stringify(siMasterList));
+                    currentView.value = 'form';
+                };
+
+                // Google Apps Script
+                const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwFAZBHoSzR0HMdp8BDaK1J1UbO3Zj3I6g7sfDJLZYgPW87ROlEpIOU6JYbFWe93iB6/exec'; 
+
+                const syncToGoogleSheets = (tab, action, data, oldId = null, successMsg = 'Tindakan berjaya dihantar ke Google Sheets.') => {
+                    const payload = {
+                        tab: tab,
+                        action: action, 
+                        data: data
+                    };
+                    
+                    if (oldId) payload.oldId = oldId;
+
+                    fetch(GOOGLE_SCRIPT_URL, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        headers: { 'Content-Type': 'text/plain' },
+                        body: JSON.stringify(payload)
+                    })
+                    .then(() => {
+                        showNotify(successMsg);
+                    })
+                    .catch((error) => {
+                        console.error('Ralat integrasi Google Sheets:', error);
+                        showNotify('Berlaku ralat semasa cuba menghantar data ke Google Sheets!', true);
+                    });
+                };
+
+                const saveForm = async () => {
+                    if (formData.value.pics && formData.value.pics.length > 3) {
+                        showNotify('Maksimum 3 orang Person In Charge dibenarkan.', true); return;
+                    }
+
+                    if (formMode.value === 'add') {
+                        formData.value.id = Date.now().toString();
+                        formData.value.year = currentYear.value;
+                        if (currentTab.value === 'stage2') formData.value.noLaporan = generateStage2Id();
+                        
+                        if (window.firebaseNotConfigured) {
+                            records[currentTab.value].push(JSON.parse(JSON.stringify(formData.value)));
+                        } else if (window.fbDb && window.fbAuth?.currentUser) {
+                            try {
+                                const rawData = JSON.parse(JSON.stringify(formData.value));
+                                await window.fbSetDoc(window.fbDoc(window.fbDb, 'artifacts', window.fbAppId, 'public', 'data', currentTab.value, formData.value.id), rawData);
+                            } catch (err) { console.error(err); }
+                        }
+                        
+                        syncToGoogleSheets(currentTab.value, 'add', formData.value, null, 'Rekod baru ditambah.');
+                    } else {
+                        if (window.firebaseNotConfigured) {
+                            const targetArray = records[currentTab.value];
+                            const index = targetArray.findIndex(r => r.id === formData.value.id);
+                            if (index !== -1) targetArray[index] = JSON.parse(JSON.stringify(formData.value));
+                        } else if (window.fbDb && window.fbAuth?.currentUser) {
+                            try {
+                                const rawData = JSON.parse(JSON.stringify(formData.value));
+                                await window.fbSetDoc(window.fbDoc(window.fbDb, 'artifacts', window.fbAppId, 'public', 'data', currentTab.value, formData.value.id), rawData);
+                            } catch (err) { console.error(err); }
+                        }
+                        
+                        syncToGoogleSheets(currentTab.value, 'edit', formData.value, null, 'Rekod dikemaskini.');
+                    }
+                    currentView.value = 'list';
+                };
+
+                const deleteConfirm = (item) => {
+                    showConfirm('Padam Rekod', 'Adakah anda pasti mahu memadam rekod ini? Tindakan ini tidak boleh dipulihkan.', true, async () => {
+                        if (window.firebaseNotConfigured) {
+                            const targetArray = records[currentTab.value];
+                            const index = targetArray.findIndex(r => r.id === item.id);
+                            if (index !== -1) targetArray.splice(index, 1);
+                        } else if (window.fbDb && window.fbAuth?.currentUser) {
+                            try {
+                                await window.fbDeleteDoc(window.fbDoc(window.fbDb, 'artifacts', window.fbAppId, 'public', 'data', currentTab.value, item.id));
+                            } catch (err) { console.error(err); }
+                        }
+                        
+                        syncToGoogleSheets(currentTab.value, 'delete', { id: item.id }, null, 'Rekod dipadam.');
+                        confirmDialog.show = false;
+                    });
+                };
+                
+                const carryForward = (item) => {
+                    showConfirm('Bawa Ke Hadapan', 'Adakah anda pasti mahu membawa rekod ini ke tahun hadapan? Rekod semasa akan dipadam.', false, async () => {
+                        const nextYear = (parseInt(currentYear.value) + 1).toString();
+                        
+                        let settingsChanged = false;
+                        if (!years.value.includes(nextYear)) {
+                            years.value.push(nextYear);
+                            years.value.sort((a,b) => b - a);
+                            settingsChanged = true;
+                        }
+                        
+                        const clonedItem = JSON.parse(JSON.stringify(item));
+                        clonedItem.id = Date.now().toString() + Math.random().toString(36).substr(2, 5);
+                        clonedItem.year = nextYear;
+                        if (currentTab.value === 'stage1') clonedItem.isBakiTahunSebelum = true;
+                        
+                        if (window.firebaseNotConfigured) {
+                            records[currentTab.value].push(clonedItem);
+                            const targetArray = records[currentTab.value];
+                            const index = targetArray.findIndex(r => r.id === item.id);
+                            if (index !== -1) targetArray.splice(index, 1);
+                        } else if (window.fbDb && window.fbAuth?.currentUser) {
+                            try {
+                                await window.fbSetDoc(window.fbDoc(window.fbDb, 'artifacts', window.fbAppId, 'public', 'data', currentTab.value, clonedItem.id), clonedItem);
+                                await window.fbDeleteDoc(window.fbDoc(window.fbDb, 'artifacts', window.fbAppId, 'public', 'data', currentTab.value, item.id));
+                            } catch (err) { console.error(err); }
+                        }
+                        
+                        if (settingsChanged) syncSettingsToFirebase();
+                        syncToGoogleSheets(currentTab.value, 'carry_forward', clonedItem, item.id, `Berjaya dibawa ke tahun ${nextYear}.`);
+                        confirmDialog.show = false;
+                    });
+                };
+
+                const exportToCSV = () => {
+                    const list = filteredList.value;
+                    if (!list.length) return showNotify('Tiada rekod untuk dieksport.', true);
+                    
+                    const allKeys = new Set();
+                    list.forEach(item => Object.keys(item).forEach(k => allKeys.add(k)));
+                    
+                    const finalHeaders = Array.from(allKeys).filter(k => 
+                        (typeof list[0][k] !== 'object' || k === 'pics') && 
+                        !['id', 'siList', 'isBakiTahunSebelum'].includes(k)
+                    );
+
+                    const csvContent = "data:text/csv;charset=utf-8," 
+                        + finalHeaders.join(",") + "\n"
+                        + list.map(row => {
+                            return finalHeaders.map(h => {
+                                let val = row[h];
+                                if (h === 'pics' && Array.isArray(val)) val = val.join(', ');
+                                if (val === undefined || val === null) val = '';
+                                val = String(val).replace(/"/g, '""');
+                                return `"${val}"`;
+                            }).join(",");
+                        }).join("\n");
+                        
+                    const encodedUri = encodeURI(csvContent);
+                    const link = document.createElement("a");
+                    link.setAttribute("href", encodedUri);
+                    link.setAttribute("download", `BRGF_${currentTab.value}_${currentYear.value}.csv`);
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    showNotify('Muat turun CSV dimulakan.');
+                };
+
+                const getPercentage = (val, total) => total > 0 ? (val/total*100) : 0;
+                
+                const currentYearRecords = (tab) => records[tab].filter(r => r.year === currentYear.value);
+
+                const availableStatuses = computed(() => {
+                    if (currentTab.value === 'dashboard') return [];
+                    const list = currentYearRecords(currentTab.value);
+                    const statuses = new Set();
+                    list.forEach(item => {
+                        let st = item.status || 'Baru';
+                        if (currentTab.value === 'stage2') st = calculateStage2Status(item);
+                        if (['stage3', 'naiktaraf'].includes(currentTab.value)) st = calculateProjectStatus(item);
+                        statuses.add(st);
+                    });
+                    return Array.from(statuses).sort();
+                });
+
+                const bakiAduanList = computed(() => {
+                    return currentYearRecords('stage1').filter(r => r.isBakiTahunSebelum);
+                });
+
+                const stats = computed(() => {
+                    const s1 = currentYearRecords('stage1');
+                    const s2 = currentYearRecords('stage2');
+                    const s3 = currentYearRecords('stage3');
+                    const khid = currentYearRecords('khidmat');
+                    const nt = currentYearRecords('naiktaraf');
+
+                    let s1MaklumBalasKurang3 = 0, s1MaklumBalasLebih3 = 0;
+                    let s1LaporanKurang21 = 0, s1LaporanLebih21 = 0;
+                    const s1StatusCount = {};
+                    
+                    const s1Monthly = Array.from({ length: 12 }, (_, i) => ({
+                        bulan: ['Januari', 'Februari', 'Mac', 'April', 'Mei', 'Jun', 'Julai', 'Ogos', 'September', 'Oktober', 'November', 'Disember'][i],
+                        jumlah: 0, belumLawatan: 0, selesaiLawatan: 0, penyediaan: 0,
+                        mbKurang3: 0, mbLebih3: 0, lapKurang21: 0, lapLebih21: 0
+                    }));
+                    
+                    const s1Baki = {
+                        jumlah: 0, belumLawatan: 0, selesaiLawatan: 0, penyediaan: 0,
+                        mbKurang3: 0, mbLebih3: 0, lapKurang21: 0, lapLebih21: 0
+                    };
+
+                    s1.forEach(r => {
+                        s1StatusCount[r.status] = (s1StatusCount[r.status] || 0) + 1;
+                        if(r.maklumBalasJadual && r.maklumBalasSebenar) {
+                            if (r.maklumBalasSebenar <= r.maklumBalasJadual) s1MaklumBalasKurang3++;
+                            else s1MaklumBalasLebih3++;
+                        }
+                        if(r.laporanJadual && r.laporanSebenar) {
+                            if (r.laporanSebenar <= r.laporanJadual) s1LaporanKurang21++;
+                            else s1LaporanLebih21++;
+                        }
+                        
+                        if (r.isBakiTahunSebelum) {
+                            s1Baki.jumlah++;
+                            if (!r.tarikhLawatan) s1Baki.belumLawatan++;
+                            else s1Baki.selesaiLawatan++;
+                            if (r.status === 'penyediaan') s1Baki.penyediaan++;
+                            if(r.maklumBalasJadual && r.maklumBalasSebenar) {
+                                if (r.maklumBalasSebenar <= r.maklumBalasJadual) s1Baki.mbKurang3++;
+                                else s1Baki.mbLebih3++;
+                            }
+                            if(r.laporanJadual && r.laporanSebenar) {
+                                if (r.laporanSebenar <= r.laporanJadual) s1Baki.lapKurang21++;
+                                else s1Baki.lapLebih21++;
+                            }
+                        } else if (r.tarikhTerima) {
+                            const month = new Date(r.tarikhTerima).getMonth();
+                            if (month >= 0 && month <= 11) {
+                                s1Monthly[month].jumlah++;
+                                if (!r.tarikhLawatan) s1Monthly[month].belumLawatan++;
+                                else s1Monthly[month].selesaiLawatan++;
+                                if (r.status === 'penyediaan') s1Monthly[month].penyediaan++;
+                                if(r.maklumBalasJadual && r.maklumBalasSebenar) {
+                                    if (r.maklumBalasSebenar <= r.maklumBalasJadual) s1Monthly[month].mbKurang3++;
+                                    else s1Monthly[month].mbLebih3++;
+                                }
+                                if(r.laporanJadual && r.laporanSebenar) {
+                                    if (r.laporanSebenar <= r.laporanJadual) s1Monthly[month].lapKurang21++;
+                                    else s1Monthly[month].lapLebih21++;
+                                }
+                            }
+                        }
+                    });
+
+                    s2.forEach(r => r.status_auto = calculateStage2Status(r));
+                    s3.forEach(r => r.status_auto = calculateProjectStatus(r));
+                    nt.forEach(r => r.status_auto = calculateProjectStatus(r));
+
+                    const aggStatus = (arr) => arr.reduce((acc, curr) => {
+                        const st = curr.status_auto || curr.status || 'Baru';
+                        acc[st] = (acc[st] || 0) + 1; return acc;
+                    }, {});
+
+                    const s1Selesai = s1.filter(r => r.status === 'selesai');
+                    const s1SelesaiMissingForm = s1Selesai.filter(r => !r.tarikhBorangKepuasan).map(r => r.noAduan || 'ID:'+r.id);
+
+                    return {
+                        stage1: {
+                            total: s1.length,
+                            belumLawatan: s1.filter(r => !r.tarikhLawatan).length,
+                            selesaiLawatan: s1.filter(r => !!r.tarikhLawatan).length,
+                            maklumBalasKurang3: s1MaklumBalasKurang3, maklumBalasLebih3: s1MaklumBalasLebih3,
+                            laporanKurang21: s1LaporanKurang21, laporanLebih21: s1LaporanLebih21,
+                            statusCounts: s1StatusCount,
+                            monthly: s1Monthly,
+                            baki: s1Baki
+                        },
+                        stage2: {
+                            total: s2.length,
+                            totalPeruntukan: s2.reduce((sum, r) => sum + (parseFloat(r.peruntukan)||0), 0),
+                            statusCounts: aggStatus(s2)
+                        },
+                        stage3: { total: s3.length, statusCounts: aggStatus(s3) },
+                        naiktaraf: { total: nt.length, statusCounts: aggStatus(nt) },
+                        khidmat: { total: khid.length, statusCounts: aggStatus(khid) },
+                        csat: {
+                            totalEligible: s1Selesai.length,
+                            received: s1Selesai.length - s1SelesaiMissingForm.length,
+                            missingList: s1SelesaiMissingForm
+                        }
+                    };
+                });
+
+                const filteredList = computed(() => {
+                    if (currentTab.value === 'dashboard') return [];
+                    let list = currentYearRecords(currentTab.value);
+                    
+                    if(currentTab.value === 'stage2') list.forEach(r => r.status_auto = calculateStage2Status(r));
+                    if(['stage3', 'naiktaraf'].includes(currentTab.value)) list.forEach(r => r.status_auto = calculateProjectStatus(r));
+
+                    if (filterStatus.value) {
+                        list = list.filter(item => {
+                            const st = item.status_auto || item.status || 'Baru';
+                            return st === filterStatus.value;
+                        });
+                    }
+
+                    if (currentTab.value === 'stage1' && filterPic.value) {
+                        list = list.filter(item => {
+                            return item.pics && Array.isArray(item.pics) && item.pics.includes(filterPic.value);
+                        });
+                    }
+
+                    if (searchQuery.value) {
+                        const q = searchQuery.value.toLowerCase();
+                        list = list.filter(item => 
+                            (item.perihal || '').toLowerCase().includes(q) || 
+                            (item.daerah || '').toLowerCase().includes(q) || 
+                            (item.noAduan || '').toLowerCase().includes(q) ||
+                            (item.noProjek || '').toLowerCase().includes(q)
+                        );
+                    }
+                    return list;
+                });
+
+                const getStatusColor = (status) => {
+                    const st = (status || '').toLowerCase();
+                    if (['selesai', 'siap'].includes(st)) return 'text-green-700 bg-green-100 border-green-200';
+                    if (['dalam pembinaan', 'pelaksanaan'].includes(st)) return 'text-amber-700 bg-amber-100 border-amber-200';
+                    if (['iklan & tender', 'lantikan', 'lawatan'].includes(st)) return 'text-blue-700 bg-blue-100 border-blue-200';
+                    if (['analisa data & laporan', 'penyediaan'].includes(st)) return 'text-purple-700 bg-purple-100 border-purple-200';
+                    return 'text-slate-700 bg-slate-100 border-slate-200';
+                };
+
+                const formatCurrency = (val) => {
+                    return parseFloat(val || 0).toLocaleString('ms-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                };
+
+                const initRealtimeData = () => {
+                    if (window.firebaseNotConfigured) return;
+                    if (!window.fbDb || !window.fbAuth?.currentUser) return;
+
+                    const db = window.fbDb;
+                    const appId = window.fbAppId;
+                    
+                    window.fbOnSnapshot(window.fbDoc(db, 'artifacts', appId, 'public', 'data', 'settings', 'metadata'), (docSnap) => {
+                        if (docSnap.exists()) {
+                            const data = docSnap.data();
+                            if (data.personnel) lists.personnel = data.personnel;
+                            if (data.years) years.value = data.years;
+                        } else {
+                            syncSettingsToFirebase();
+                        }
+                    }, (err) => console.error(err));
+
+                    const collectionsToSync = ['stage1', 'stage2', 'stage3', 'khidmat', 'naiktaraf'];
+                    collectionsToSync.forEach(tab => {
+                        window.fbOnSnapshot(window.fbCollection(db, 'artifacts', appId, 'public', 'data', tab), (snapshot) => {
+                            const loadedRecords = [];
+                            snapshot.forEach(docSnap => loadedRecords.push(docSnap.data()));
+                            records[tab] = loadedRecords; 
+                        }, (err) => console.error(err));
+                    });
+                };
+
+                onMounted(() => {
+                    if (window.firebaseNotConfigured) {
+                        showNotify(window.authErrorMessage || 'Sistem beroperasi dalam mod luar talian.', false);
+                    } else if (window.fbDb && window.fbAuth?.currentUser) {
+                        initRealtimeData();
+                    } else {
+                        window.addEventListener('firebase-auth-ready', () => {
+                            if (window.firebaseNotConfigured) {
+                                showNotify(window.authErrorMessage || 'Sistem beroperasi dalam mod luar talian.', false);
+                            } else {
+                                initRealtimeData();
+                            }
+                        });
+                    }
+                });
+
+                return {
+                    currentTab, currentView, formMode, mobileMenuOpen, currentYear, years, searchQuery, filterStatus, filterPic, availableStatuses,
+                    changeTab, getTabTitle, addYear, formData, saveForm, openForm, editItem, deleteConfirm, carryForward, exportToCSV,
+                    confirmDialog, promptDialog, lists, showPersonnelModal, newPersonnelName, addPersonnel, removePersonnel,
+                    newSiType, addSiType, generateAutoIdIfValid, calculateStage2Status, calculateProjectStatus,
+                    filteredList, bakiAduanList, getStatusColor, stats, getPercentage, formatCurrency, notification, window
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
