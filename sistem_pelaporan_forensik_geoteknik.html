@@ -208,46 +208,6 @@
                             </div>
                         </div>
 
-                        <!-- NEW BOX: Senarai Baki Aduan (Tahun Sebelum) -->
-                        <div v-if="currentYear === '2026' || bakiAduanList.length > 0" class="bg-white rounded-xl shadow-md border border-slate-200 p-6 print-break-inside-avoid lg:col-span-3">
-                            <h3 class="text-lg font-bold text-slate-800 mb-4 border-b pb-3 flex items-center gap-2">
-                                <i class="fas fa-history text-orange-500"></i> Senarai Baki Aduan (Tahun Sebelum)
-                            </h3>
-                            <div class="overflow-x-auto">
-                                <table class="w-full text-sm text-left border-collapse border border-slate-200">
-                                    <thead class="bg-slate-100 text-slate-700 text-xs uppercase">
-                                        <tr>
-                                            <th class="border border-slate-300 p-3 w-16 text-center">Bil</th>
-                                            <th class="border border-slate-300 p-3">No Aduan</th>
-                                            <th class="border border-slate-300 p-3">Tarikh Lawatan</th>
-                                            <th class="border border-slate-300 p-3">Tarikh Laporan Aduan</th>
-                                            <th class="border border-slate-300 p-3">Status Laporan Aduan</th>
-                                            <th class="border border-slate-300 p-3 text-center">Impak</th>
-                                            <th class="border border-slate-300 p-3 text-center">Punca Utama</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr v-for="(item, index) in bakiAduanList" :key="item.id" class="hover:bg-slate-50 border-b border-slate-200">
-                                            <td class="border border-slate-200 p-3 text-center font-medium">{{ index + 1 }}</td>
-                                            <td class="border border-slate-200 p-3 font-semibold text-primary">{{ item.noAduan || '-' }}</td>
-                                            <td class="border border-slate-200 p-3">{{ item.tarikhLawatan || '-' }}</td>
-                                            <td class="border border-slate-200 p-3">{{ item.tarikhLaporanAduan || '-' }}</td>
-                                            <td class="border border-slate-200 p-3">
-                                                <span class="px-2 py-1 text-xs font-medium rounded-full border bg-opacity-10" :class="getStatusColor(item.status)">
-                                                    {{ item.status || 'Baru' }}
-                                                </span>
-                                            </td>
-                                            <td class="border border-slate-200 p-3 text-center capitalize">{{ item.impak || '-' }}</td>
-                                            <td class="border border-slate-200 p-3 text-center">{{ item.punca || '-' }}</td>
-                                        </tr>
-                                        <tr v-if="bakiAduanList.length === 0">
-                                            <td colspan="7" class="p-4 text-center text-slate-500 bg-slate-50">Tiada rekod baki aduan ditemui untuk tahun ini.</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
                         <!-- Row 2: Status Siasatan & Projek (3 cols) -->
                         <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 print-break-inside-avoid lg:col-span-3">
                             <h3 class="font-bold text-slate-700 mb-4 border-b pb-2 flex items-center gap-2">
@@ -717,37 +677,57 @@
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Konfigurasi sistem Firebase yang dibekalkan secara dinamik oleh persekitaran
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        // GANTIKAN KONFIGURASI INI JIKA ANDA MENGGUNAKAN GOOGLE APPS SCRIPT ATAU HOSTING SENDIRI
+        let firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        
+        // JIKA 'firebaseConfig' null (bermakna anda guna fail ini di luar), SILA MASUKKAN MAKLUMAT FIREBASE ANDA SENDIRI:
+        // Anda boleh dapatkan maklumat ini secara percuma di https://console.firebase.google.com/
+        if (!firebaseConfig || Object.keys(firebaseConfig).length === 0) {
+            firebaseConfig = null;
+            /* BUANG TANDA KOMEN (//) DI BAWAH DAN MASUKKAN MAKLUMAT FIREBASE ANDA:
+            firebaseConfig = {
+                apiKey: "API_KEY_ANDA",
+                authDomain: "DOMAIN_ANDA.firebaseapp.com",
+                projectId: "PROJECT_ID_ANDA",
+                storageBucket: "PROJECT_ID_ANDA.appspot.com",
+                messagingSenderId: "SENDER_ID",
+                appId: "APP_ID"
+            };
+            */
+        }
+
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'brgf-default-app';
 
-        const app = initializeApp(firebaseConfig);
-        window.fbDb = getFirestore(app);
-        window.fbAuth = getAuth(app);
-        window.fbAppId = appId;
-        
-        // Membuka fungsi Firestore ke global untuk digunakan oleh Vue CDN
-        window.fbSetDoc = setDoc;
-        window.fbDeleteDoc = deleteDoc;
-        window.fbDoc = doc;
-        window.fbOnSnapshot = onSnapshot;
-        window.fbCollection = collection;
+        if (firebaseConfig) {
+            const app = initializeApp(firebaseConfig);
+            window.fbDb = getFirestore(app);
+            window.fbAuth = getAuth(app);
+            window.fbAppId = appId;
+            
+            // Membuka fungsi Firestore ke global untuk digunakan oleh Vue CDN
+            window.fbSetDoc = setDoc;
+            window.fbDeleteDoc = deleteDoc;
+            window.fbDoc = doc;
+            window.fbOnSnapshot = onSnapshot;
+            window.fbCollection = collection;
 
-        // Proses pengesahan Firebase
-        const initAuth = async () => {
-            try {
-                if (typeof __initial_auth_token !== 'undefined') {
-                    await signInWithCustomToken(window.fbAuth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(window.fbAuth);
+            const initAuth = async () => {
+                try {
+                    if (typeof __initial_auth_token !== 'undefined') {
+                        await signInWithCustomToken(window.fbAuth, __initial_auth_token);
+                    } else {
+                        await signInAnonymously(window.fbAuth);
+                    }
+                    window.dispatchEvent(new Event('firebase-auth-ready'));
+                } catch (e) {
+                    console.error("Firebase auth error:", e);
                 }
-                // Hantar signal kepada Vue bahawa Firebase sudah sedia ada
-                window.dispatchEvent(new Event('firebase-auth-ready'));
-            } catch (e) {
-                console.error("Firebase auth error:", e);
-            }
-        };
-        initAuth();
+            };
+            initAuth();
+        } else {
+            console.warn("Mod Separa (Offline): Sila masukkan konfigurasi Firebase anda untuk fungsi Real-Time.");
+            window.firebaseNotConfigured = true;
+        }
     </script>
 
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
@@ -900,7 +880,7 @@
 
                 // Fungsi penyegerakan (sync) Metadata ke Firebase
                 const syncSettingsToFirebase = async () => {
-                    if (!window.fbDb) return;
+                    if (window.firebaseNotConfigured || !window.fbDb || !window.fbAuth?.currentUser) return;
                     try {
                         await window.fbSetDoc(window.fbDoc(window.fbDb, 'artifacts', window.fbAppId, 'public', 'data', 'settings', 'metadata'), {
                             personnel: JSON.parse(JSON.stringify(lists.personnel)),
@@ -1010,19 +990,15 @@
                         data: data
                     };
                     
-                    // Jika ada ID lama (khas untuk rujukan bawa ke hadapan)
                     if (oldId) payload.oldId = oldId;
 
                     fetch(GOOGLE_SCRIPT_URL, {
                         method: 'POST',
                         mode: 'no-cors',
-                        headers: {
-                            'Content-Type': 'text/plain' 
-                        },
+                        headers: { 'Content-Type': 'text/plain' },
                         body: JSON.stringify(payload)
                     })
                     .then(() => {
-                        // Mod 'no-cors' tidak memulangkan data, tetapi jika melepasi blok ini bermakna tiada ralat rangkaian.
                         showNotify(successMsg);
                     })
                     .catch((error) => {
@@ -1032,7 +1008,6 @@
                 };
 
                 const saveForm = async () => {
-                    // Enforce max 3 pics
                     if (formData.value.pics && formData.value.pics.length > 3) {
                         showNotify('Maksimum 3 orang Person In Charge dibenarkan.', true); return;
                     }
@@ -1040,43 +1015,56 @@
                     if (formMode.value === 'add') {
                         formData.value.id = Date.now().toString();
                         formData.value.year = currentYear.value;
-                        
-                        // Stage specific generation on add
                         if (currentTab.value === 'stage2') formData.value.noLaporan = generateStage2Id();
                         
-                        // Hantar ke Firestore (Masa Nyata)
-                        try {
-                            const rawData = JSON.parse(JSON.stringify(formData.value));
-                            await window.fbSetDoc(window.fbDoc(window.fbDb, 'artifacts', window.fbAppId, 'public', 'data', currentTab.value, formData.value.id), rawData);
-                            // HANTAR KE GOOGLE SHEETS (TAMBAH)
-                            syncToGoogleSheets(currentTab.value, 'add', formData.value, null, 'Rekod baru berjaya ditambah dan disimpan ke dalam Google Sheet.');
-                        } catch (err) { console.error("Firestore Save Error", err); showNotify('Gagal menyimpan ke pangkalan data masa nyata', true); }
+                        // Kemaskini Antaramuka (UI) jika tiada pangkalan data
+                        if (window.firebaseNotConfigured) {
+                            records[currentTab.value].push(JSON.parse(JSON.stringify(formData.value)));
+                        } else if (window.fbDb && window.fbAuth?.currentUser) {
+                            try {
+                                const rawData = JSON.parse(JSON.stringify(formData.value));
+                                await window.fbSetDoc(window.fbDoc(window.fbDb, 'artifacts', window.fbAppId, 'public', 'data', currentTab.value, formData.value.id), rawData);
+                            } catch (err) { console.error(err); }
+                        }
+                        
+                        syncToGoogleSheets(currentTab.value, 'add', formData.value, null, 'Rekod baru ditambah.');
                     } else {
-                        // Hantar ke Firestore (Masa Nyata)
-                        try {
-                            const rawData = JSON.parse(JSON.stringify(formData.value));
-                            await window.fbSetDoc(window.fbDoc(window.fbDb, 'artifacts', window.fbAppId, 'public', 'data', currentTab.value, formData.value.id), rawData);
-                            // HANTAR KE GOOGLE SHEETS (KEMASKINI)
-                            syncToGoogleSheets(currentTab.value, 'edit', formData.value, null, 'Rekod berjaya dikemaskini di dalam sistem dan Google Sheet.');
-                        } catch (err) { console.error("Firestore Update Error", err); showNotify('Gagal mengemaskini ke pangkalan data masa nyata', true); }
+                        // Kemaskini Antaramuka (UI) jika tiada pangkalan data
+                        if (window.firebaseNotConfigured) {
+                            const targetArray = records[currentTab.value];
+                            const index = targetArray.findIndex(r => r.id === formData.value.id);
+                            if (index !== -1) targetArray[index] = JSON.parse(JSON.stringify(formData.value));
+                        } else if (window.fbDb && window.fbAuth?.currentUser) {
+                            try {
+                                const rawData = JSON.parse(JSON.stringify(formData.value));
+                                await window.fbSetDoc(window.fbDoc(window.fbDb, 'artifacts', window.fbAppId, 'public', 'data', currentTab.value, formData.value.id), rawData);
+                            } catch (err) { console.error(err); }
+                        }
+                        
+                        syncToGoogleSheets(currentTab.value, 'edit', formData.value, null, 'Rekod dikemaskini.');
                     }
                     currentView.value = 'list';
                 };
 
                 const deleteConfirm = (item) => {
                     showConfirm('Padam Rekod', 'Adakah anda pasti mahu memadam rekod ini? Tindakan ini tidak boleh dipulihkan.', true, async () => {
-                        try {
-                            await window.fbDeleteDoc(window.fbDoc(window.fbDb, 'artifacts', window.fbAppId, 'public', 'data', currentTab.value, item.id));
-                            // HANTAR KE GOOGLE SHEETS (PADAM)
-                            syncToGoogleSheets(currentTab.value, 'delete', { id: item.id }, null, 'Rekod berjaya dipadam dari sistem dan Google Sheet.');
-                        } catch (err) { console.error("Firestore Delete Error", err); }
+                        if (window.firebaseNotConfigured) {
+                            const targetArray = records[currentTab.value];
+                            const index = targetArray.findIndex(r => r.id === item.id);
+                            if (index !== -1) targetArray.splice(index, 1);
+                        } else if (window.fbDb && window.fbAuth?.currentUser) {
+                            try {
+                                await window.fbDeleteDoc(window.fbDoc(window.fbDb, 'artifacts', window.fbAppId, 'public', 'data', currentTab.value, item.id));
+                            } catch (err) { console.error(err); }
+                        }
                         
+                        syncToGoogleSheets(currentTab.value, 'delete', { id: item.id }, null, 'Rekod dipadam.');
                         confirmDialog.show = false;
                     });
                 };
                 
                 const carryForward = (item) => {
-                    showConfirm('Bawa Ke Hadapan', 'Adakah anda pasti mahu membawa rekod ini ke tahun hadapan? Rekod pada tahun semasa akan dipadam.', false, async () => {
+                    showConfirm('Bawa Ke Hadapan', 'Adakah anda pasti mahu membawa rekod ini ke tahun hadapan? Rekod semasa akan dipadam.', false, async () => {
                         const nextYear = (parseInt(currentYear.value) + 1).toString();
                         
                         let settingsChanged = false;
@@ -1089,22 +1077,22 @@
                         const clonedItem = JSON.parse(JSON.stringify(item));
                         clonedItem.id = Date.now().toString() + Math.random().toString(36).substr(2, 5);
                         clonedItem.year = nextYear;
-                        if (currentTab.value === 'stage1') {
-                            clonedItem.isBakiTahunSebelum = true;
+                        if (currentTab.value === 'stage1') clonedItem.isBakiTahunSebelum = true;
+                        
+                        if (window.firebaseNotConfigured) {
+                            records[currentTab.value].push(clonedItem);
+                            const targetArray = records[currentTab.value];
+                            const index = targetArray.findIndex(r => r.id === item.id);
+                            if (index !== -1) targetArray.splice(index, 1);
+                        } else if (window.fbDb && window.fbAuth?.currentUser) {
+                            try {
+                                await window.fbSetDoc(window.fbDoc(window.fbDb, 'artifacts', window.fbAppId, 'public', 'data', currentTab.value, clonedItem.id), clonedItem);
+                                await window.fbDeleteDoc(window.fbDoc(window.fbDb, 'artifacts', window.fbAppId, 'public', 'data', currentTab.value, item.id));
+                            } catch (err) { console.error(err); }
                         }
                         
-                        try {
-                            // Cipta rekod baharu di Firestore
-                            await window.fbSetDoc(window.fbDoc(window.fbDb, 'artifacts', window.fbAppId, 'public', 'data', currentTab.value, clonedItem.id), clonedItem);
-                            // Padam rekod lama di Firestore
-                            await window.fbDeleteDoc(window.fbDoc(window.fbDb, 'artifacts', window.fbAppId, 'public', 'data', currentTab.value, item.id));
-                            
-                            if (settingsChanged) syncSettingsToFirebase();
-                            
-                            // HANTAR KE GOOGLE SHEETS (BAWA KE HADAPAN)
-                            syncToGoogleSheets(currentTab.value, 'carry_forward', clonedItem, item.id, `Rekod berjaya dibawa ke tahun ${nextYear} dan direkodkan di Google Sheet.`);
-                        } catch (err) { console.error("Firestore Carry Forward Error", err); }
-
+                        if (settingsChanged) syncSettingsToFirebase();
+                        syncToGoogleSheets(currentTab.value, 'carry_forward', clonedItem, item.id, `Berjaya dibawa ke tahun ${nextYear}.`);
                         confirmDialog.show = false;
                     });
                 };
@@ -1326,40 +1314,39 @@
 
                 // --- PANGKALAN DATA MASA NYATA (FIRESTORE) LOGIC ---
                 const initRealtimeData = () => {
-                    if (!window.fbDb) return;
+                    if (window.firebaseNotConfigured) return;
+                    if (!window.fbDb || !window.fbAuth?.currentUser) return; // Pengawal keselamatan
+
                     const db = window.fbDb;
                     const appId = window.fbAppId;
                     
-                    // 1. Dengar perubahan tetapan (Tahun & Pegawai)
                     window.fbOnSnapshot(window.fbDoc(db, 'artifacts', appId, 'public', 'data', 'settings', 'metadata'), (docSnap) => {
                         if (docSnap.exists()) {
                             const data = docSnap.data();
                             if (data.personnel) lists.personnel = data.personnel;
                             if (data.years) years.value = data.years;
                         } else {
-                            // Kali pertama digunakan - simpan nilai lalai (default) sistem
                             syncSettingsToFirebase();
                         }
-                    }, (err) => console.error("Error setting snapshot:", err));
+                    }, (err) => console.error(err));
 
-                    // 2. Dengar perubahan rekod bagi setiap modul (stage1, stage2 dll)
                     const collectionsToSync = ['stage1', 'stage2', 'stage3', 'khidmat', 'naiktaraf'];
                     collectionsToSync.forEach(tab => {
                         window.fbOnSnapshot(window.fbCollection(db, 'artifacts', appId, 'public', 'data', tab), (snapshot) => {
                             const loadedRecords = [];
                             snapshot.forEach(docSnap => loadedRecords.push(docSnap.data()));
-                            records[tab] = loadedRecords;
-                        }, (err) => console.error(`Error ${tab} snapshot:`, err));
+                            records[tab] = loadedRecords; // Automatik kemaskini antaramuka secara real-time
+                        }, (err) => console.error(err));
                     });
                 };
 
                 // Initialize App Data
                 onMounted(() => {
-                    // Semak jika Firebase Authentication sudah melepasi proses login (samada token atau anonymously)
-                    if (window.fbDb && window.fbAuth.currentUser) {
+                    if (window.firebaseNotConfigured) {
+                        showNotify('Sistem sedang beroperasi dalam mod luar talian (Hanya simpanan Google Sheets aktif).', false);
+                    } else if (window.fbDb && window.fbAuth?.currentUser) {
                         initRealtimeData();
                     } else {
-                        // Jika belum, dengar pada event yang dihantar melalui blok modul script di atas
                         window.addEventListener('firebase-auth-ready', initRealtimeData);
                     }
                 });
